@@ -56,8 +56,19 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        print(x)
+        print("length: ")
+        #df = pd.DataFrame(index=x, columns=[1,2,3,4,5,6,7,8,9])
+        with open("output.txt","w") as f:
+            f.write(str(x))
 
-        # Replace this code with your own
+
+        #print(len(x))
+        x.fillna(0)
+        #print("After: ")
+        #print(x)
+        #print("Stop")
+        
         # Return preprocessed x and y, return None for y if it was None
         return x, (y if isinstance(y, pd.DataFrame) else None)
 
