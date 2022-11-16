@@ -117,14 +117,10 @@ class SigmoidLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
+        
+        self._cache_current = x
+        return 1 / (1+ np.exp(-x))
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def backward(self, grad_z):
         """
@@ -140,14 +136,7 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return grad_z * self.forward(self._cache_current) * (1 - self.forward(self._cache_current))
 
 
 class ReluLayer(Layer):
@@ -174,14 +163,8 @@ class ReluLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._cache_current = x
+        return np.where(x > 0, x, 0)
 
     def backward(self, grad_z):
         """
@@ -197,14 +180,8 @@ class ReluLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        
+        return np.dot(np.where(self._cache_current > 0, 1, 0), grad_z)
 
 
 class LinearLayer(Layer):
@@ -222,20 +199,15 @@ class LinearLayer(Layer):
         """
         self.n_in = n_in
         self.n_out = n_out
+        
+        self._W = xavier_init((n_in, n_out))
+        self._b = np.zeros(n_out, )
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._W = None
-        self._b = None
-
-        self._cache_current = None
-        self._grad_W_current = None
+        self._cache_current = None  # forward
+        self._grad_W_current = None # check if works else initlaise with ones
         self._grad_b_current = None
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        
 
     def forward(self, x):
         """
@@ -250,14 +222,12 @@ class LinearLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        
+        self._cache_current = np.trasnpose(x)
+        # linear function
+        return np.multiply(x, self._W) + self._b
+        
+        
 
     def backward(self, grad_z):
         """
@@ -273,14 +243,13 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        
+        self._grad_W_current = np.multiply(self._cache_current, grad_z)
+        self._grad_b_current = np.multiply(np.ones(1, len(grad_z)), grad_z)
+        
+        return np.multiply(np.traspose(self._W), grad_z)
+        
+        
 
     def update_params(self, learning_rate):
         """
@@ -290,14 +259,8 @@ class LinearLayer(Layer):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._W = self._W - learning_rate * self._grad_W_current
+        self._b = self._b - learning_rate * self._grad_b_current
 
 
 class MultiLayerNetwork(object):
