@@ -2,6 +2,7 @@ import torch
 import pickle
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelBinarizer #For one-hot encoding
 
 class Regressor():
 
@@ -23,11 +24,14 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        # Replace this code with your own
+        self.bin_labels  = LabelBinarizer()
+        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
+
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        self.nb_epoch = nb_epoch 
+        self.nb_epoch = nb_epoch
+        
         return
 
         #######################################################################
@@ -35,6 +39,7 @@ class Regressor():
         #######################################################################
 
     def _preprocessor(self, x, y = None, training = False):
+
         """ 
         Preprocess input of the network.
           
@@ -56,20 +61,11 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        print(x)
-        print("length: ")
-        #df = pd.DataFrame(index=x, columns=[1,2,3,4,5,6,7,8,9])
-        with open("output.txt","w") as f:
-            f.write(str(x))
-
-
-        #print(len(x))
         x.fillna(0)
-        #print("After: ")
-        #print(x)
-        #print("Stop")
-        
-        # Return preprocessed x and y, return None for y if it was None
+        proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
+        x = x.drop(columns="ocean_proximity",axis = 1)
+        x = x.join(proximity_column)
+        print(x)
         return x, (y if isinstance(y, pd.DataFrame) else None)
 
         #######################################################################
