@@ -62,30 +62,6 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         
-        # longitude_mean,latitude_mean,income_mean  = x[["longitude"]].mean(), x[["latitude"]].mean(), x[["median_income"]].mean()
-        # age_median,rooms_median,beds_median = x[["housing_median_age"]].median(), x[["total_rooms"]].median(), x[["total_bedrooms"]].median()
-        # population_median,households_median = x[["population"]].median(), x[["households"]].median()
-        # proximity_mode = x[["ocean_proximity"]].mode()
-        # print("avg: ",proximity_mode)
-        # print("done")
-        # empty_columns = x.columns[x.isna().any()].tolist()
-        
-
-        # average_tbl = {"longitude": longitude_mean,"latitude": latitude_mean,"housing_median_age": age_median,
-        #     "total_rooms": rooms_median, "total_bedrooms": beds_median, "population": population_median,
-        #     "households": households_median, "median_income": income_mean, "ocean_proximity": proximity_mode
-        #     }
-        # # for col in empty_columns:
-        # #     mask = x[col].fillna(average_tbl[col])
-        # #     x.loc[mask,col] #= x[[col]].fillna(average_tbl[col])
-        # #     #x[col].isnull().fillna(average_tbl[col])
-        # print(empty_columns)
-        # for col in empty_columns:
-        #     x[[col]] = x[[col]].fillna(average_tbl[col])
-        #     print(average_tbl[col])
-        # print(x)
-
-
         #Fills empty data points with averages of their column
         for col in x:
             if col ==("longitude" or "latitude" or "median_income"):
@@ -94,16 +70,7 @@ class Regressor():
                 x[col].fillna(x[col].mode()[0], inplace=True)
             else:
                 x[col].fillna(x[col].median(), inplace=True)
-            #x["ocean_proximity"].fillna(x["ocean_proximity"].median(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        # x["housing_median_age"].fillna(x["housing_median_age"].median(), inplace=True)
-        # x["total_rooms"].fillna(x["total_rooms"].median(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        # x["longitude"].fillna(x["longitude"].mean(), inplace=True)
-        
+
         print(x)
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
