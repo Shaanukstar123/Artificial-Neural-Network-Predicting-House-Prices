@@ -75,6 +75,8 @@ class Regressor():
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
         x = x.join(proximity_column)
+
+        x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
         print(x)
         return x, (y if isinstance(y, pd.DataFrame) else None)
 
