@@ -61,7 +61,22 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        x.fillna(0)
+        
+        #averages to fill in blanks
+        longitude_mean,latitude_mean,income_mean  = 0,0,0#x[["longitude"]].mean(), x[["latitude"]].mean(), x[["median_income"]].mean()
+        age_median,rooms_median,beds_median = 0,0,0#x[["housing_median_age"]].median(), x[["total_rooms"]].median(), x[["population"]].median()
+        population_median,households_median,value_median = 0,0,0#x[["population"]].median(), x[["households"]].median(),x[["median_house_value"]].median()
+        proximity_mode = x[["ocean_proximity"]].mode()
+        print("avg: ",proximity_mode)
+        print("done")
+
+        x.fillna({"longitude": longitude_mean,"latitude": latitude_mean,"housing_median_age": age_median,
+            "total_rooms": rooms_median, "total_bedrooms": beds_median, "population": population_median,
+            "households": households_median, "median_income": income_mean, "ocean_proximity": proximity_mode,
+            "median_house_value": value_median
+            },inplace = True)
+        #print(x.apply(lambda x: sum(x.isnull()),axis=0))
+
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
         x = x.join(proximity_column)
