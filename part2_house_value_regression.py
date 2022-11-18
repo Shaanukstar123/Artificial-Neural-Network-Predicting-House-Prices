@@ -13,7 +13,7 @@ class Regressor():
           
         Arguments:
             - x {pd.DataFrame} -- Raw input data of shape 
-                (batch_size, input_size), used to compute the size 
+                (batch_size, input_size), used to compute the size P
                 of the network.
             - nb_epoch {int} -- number of epochs to train the network.
 
@@ -24,12 +24,11 @@ class Regressor():
         #######################################################################
 
         # Replace this code with your own
-        X, _ = self._preprocessor(x, training = True)
-        self.input_size = X.shape[1]
-        self.output_size = 1
+        X, _ = self._preprocessor(x, training = True) 
+        self.input_size = X.shape[1] 
+        self.output_size = 1 
         self.nb_epoch = nb_epoch 
-        return
-
+        return 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -94,7 +93,6 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
         return self
 
