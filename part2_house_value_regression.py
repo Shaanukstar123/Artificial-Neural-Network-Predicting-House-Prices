@@ -2,10 +2,11 @@ import torch
 import pickle
 import numpy as np
 import pandas as pd
+from sklearn import preprocessing, model_selection #For one-hot encoding and GridSearch for hyperparam tuning
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch = 1000):
+    def __init__(self, x, maxepoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=512, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -23,17 +24,32 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        # Replace this code with your own
-        X, _ = self._preprocessor(x, training = True) 
-        self.input_size = X.shape[1] 
-        self.output_size = 1 
-        self.nb_epoch = nb_epoch 
-        return 
+        self.bin_labels  = preprocessing.LabelBinarizer()
+        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
+        #nb_epoch = 1000, learningRate=0.01, neuroncount=8, neuronLayers=3, batchSize=512, 
+        X, _ = self._preprocessor(x, training = True)
+        self.input_size = X.shape[1]
+        self.output_size = 1
+        if paramDict:
+            self.maxepoch = paramDict["maxepoch"]
+            self.learningRate = paramDict["learningRate"]
+            self.neuronArchitecture = paramDict["neuronArchitecture"]
+            self.batchSize = paramDict["batchSize"]
+            self.minImprovement = paramDict["minImprovement"]
+        else:
+            self.maxepoch = maxepoch
+            self.learningRate = learningRate
+            self.neuronArchitecture = neuronArchitecture
+            self.batchSize = batchSize
+            self.minImprovement = minImprovement
+        return
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
 
     def _preprocessor(self, x, y = None, training = False):
+
         """ 
         Preprocess input of the network.
           
@@ -55,20 +71,21 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        print(x)
-        print("length: ")
-        #df = pd.DataFrame(index=x, columns=[1,2,3,4,5,6,7,8,9])
-        with open("output.txt","w") as f:
-            f.write(str(x))
-
-
-        #print(len(x))
-        x.fillna(0)
-        #print("After: ")
-        #print(x)
-        #print("Stop")
         
-        # Return preprocessed x and y, return None for y if it was None
+        #Fills empty data points with averages of their column
+        for col in x:
+            if col ==("longitude" or "latitude" or "median_income"):
+                x[col].fillna(x[col].mean(), inplace=True)
+            elif col == "ocean_proximity":
+                x[col].fillna(x[col].mode()[0], inplace=True)
+            else:
+                x[col].fillna(x[col].median(), inplace=True)
+
+        print(x)
+        proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
+        x = x.drop(columns="ocean_proximity",axis = 1)
+        x = x.join(proximity_column)
+        print(x)
         return x, (y if isinstance(y, pd.DataFrame) else None)
 
         #######################################################################
@@ -173,7 +190,7 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(): 
+def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iterations=3): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -186,10 +203,13 @@ def RegressorHyperParameterSearch():
         The function should return your optimised hyper-parameters. 
 
     """
-
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
+    iteration = 1
+    while iteration < iterations:
+        iteration += 1
+        
 
     return  # Return the chosen hyper parameters
 
@@ -211,6 +231,15 @@ def example_main():
     # Splitting input and output
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
+    #Hyperparameter tuning
+    baseparam = {
+        "maxepoch" : 1000, 
+        "learningRate" : [0.001, 0.01, 0.1, 1], 
+        "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
+        "batchSize" : [64, 128, 256, 512],
+        "minImprovement" : 0.1, 
+        }
+    RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.5, 3)
 
     # Training
     # This example trains on the whole available dataset. 
@@ -218,6 +247,7 @@ def example_main():
     # to make sure the model isn't overfitting
     regressor = Regressor(x_train, nb_epoch = 10)
     regressor.fit(x_train, y_train)
+    #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
 
     # Error
