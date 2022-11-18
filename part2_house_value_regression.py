@@ -6,7 +6,7 @@ from sklearn.preprocessing import LabelBinarizer #For one-hot encoding
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch = 1000):
+    def __init__(self, x, nb_epoch = 1000, batch = 128):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -23,14 +23,15 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
-        self.bin_labels  = LabelBinarizer()
+        
+        self.bin_labels  = LabelBinarizer() #variables for _preprocessor
         self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
 
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
         self.nb_epoch = nb_epoch
+        self.batch_size = batch
         
         return
 
@@ -63,6 +64,7 @@ class Regressor():
         #######################################################################
         
         #Fills empty data points with averages of their column
+        pd.options.mode.chained_assignment = None
         for col in x:
             if col in {"longitude","latitude", "median_income"}:
                 x[col].fillna(x[col].mean(), inplace=True)
@@ -72,6 +74,7 @@ class Regressor():
                 x[col].fillna(x[col].median(), inplace=True)
 
         print(x)
+        
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
         x = x.join(proximity_column)
@@ -104,6 +107,9 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+
+        batch_size = min(X.size()[0],self.batch_size) #For the case if remaining dataset is smaller than batch_size
+        #get random index list
         return self
 
         #######################################################################
@@ -238,3 +244,5 @@ def example_main():
 if __name__ == "__main__":
     example_main()
 
+## Sources: https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/
+##          https://pandas.pydata.org/
