@@ -64,7 +64,7 @@ class Regressor():
         
         #Fills empty data points with averages of their column
         for col in x:
-            if col ==("longitude" or "latitude" or "median_income"):
+            if col in {"longitude","latitude", "median_income"}:
                 x[col].fillna(x[col].mean(), inplace=True)
             elif col == "ocean_proximity":
                 x[col].fillna(x[col].mode()[0], inplace=True)
