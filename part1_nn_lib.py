@@ -277,7 +277,7 @@ class MultiLayerNetwork(object):
             - input_dim {int} -- Number of features in the input (excluding 
                 the batch dimension).
             - neurons {list} -- Number of neurons in each linear layer 
-                represented as a list. The length of the list determines the 
+                represented as a list. The length of the list determines the 
                 number of linear layers.
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.
@@ -289,7 +289,24 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._layers = None
+        self._layers = [] #Array to store all the instances of various layers instantiated
+        layer_count = len(neurons)
+        for i in range(layer_count):
+            if(i == 0):
+                self._layers.append(LinearLayer(input_dim, neurons[i]))
+            
+            else:
+                self._layers.append(LinearLayer(neurons[i-1], neurons[i]))
+
+            if(activations[i] == "relu"):
+                self._layers.append(ReluLayer())
+            
+            else:
+                # sigmoid
+                self._layers.append(SigmoidLayer())
+                
+
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -308,8 +325,12 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        return np.zeros((1, self.neurons[-1])) # Replace with your own code
-
+        # return np.zeros((1, self.neurons[-1])) # Replace with your own code
+        prev_layer = self.layers[0].forward(x)
+        for layer in self._layers[1:]:
+            prev_layer = layer.forward(prev_layer)
+            
+        return prev_layer
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -332,7 +353,11 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        
+        for layer in reversed(self._layers):
+            grad_z = layer.backward(grad_z)
+            
+        return grad_z
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -349,8 +374,9 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
-
+        for l in range(len(self._layers)-2, -1, -2):
+            self._layers[l].update_params(learning_rate)
+        
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -410,7 +436,11 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._loss_layer = None
+        if loss_fun == "mse":
+            self._loss_layer =  MSELossLayer()
+        else: # cross_entropy
+            self._loss_layer = CrossEntropyLossLayer()
+            
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -433,8 +463,14 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        
+        # generate random permutation to apply to both input and target 
+        p = np.random.permutation(len(input_dataset))
+        input_shuffled, target_shuffled = input_dataset[p], target_dataset[p]
 
+        return input_shuffled, target_shuffled  
+        
+    
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -462,7 +498,23 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+
+        for i in range(self.nb_epoch):
+            if(self.shuffle_flag):
+                self.shuffle(input_dataset, target_dataset)
+                
+            for j in range(0, len(input_dataset), self.batch_size):
+                # split into batches
+                input_batch = input_dataset[j:j+self.batch_size]
+                target_batch = target_dataset[j:j+self.batch_size]
+                # forward pass
+                output = self.network.forward(input_batch)
+                # compute loss
+                self._loss_layer.forward(output, target_batch)
+                # backward pass
+                self.network.backward(self._loss_layer.backward())
+                # update params
+                self.network.update_params(self.learning_rate)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -485,7 +537,7 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        return self._loss_layer.forward(self.network.forward(input_dataset), target_dataset)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -510,8 +562,9 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
-
+        self.min = np.min(data, axis=0)
+        self.max = np.max(data, axis=0)
+        
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -529,7 +582,8 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        # since a = 0 and b = 1, we can simplify the formula
+        return (data - self.min) / (self.max - self.min)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -548,7 +602,7 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        return np.multiply(data, (self.max - self.min)) + self.xmin
 
         #######################################################################
         #                       ** END OF YOUR CODE **
