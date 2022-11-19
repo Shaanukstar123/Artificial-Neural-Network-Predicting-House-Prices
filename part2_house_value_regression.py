@@ -2,11 +2,11 @@ import torch
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelBinarizer #For one-hot encoding
+from sklearn import preprocessing, model_selection #For one-hot encoding and GridSearch for hyperparam tuning
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch = 1000, batch = 128):
+    def __init__(self, x, maxepoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=512, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -14,7 +14,7 @@ class Regressor():
           
         Arguments:
             - x {pd.DataFrame} -- Raw input data of shape 
-                (batch_size, input_size), used to compute the size 
+                (batch_size, input_size), used to compute the size P
                 of the network.
             - nb_epoch {int} -- number of epochs to train the network.
 
@@ -23,16 +23,25 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        
-        self.bin_labels  = LabelBinarizer() #variables for _preprocessor
-        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
 
+        self.bin_labels  = preprocessing.LabelBinarizer()
+        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
+        #nb_epoch = 1000, learningRate=0.01, neuroncount=8, neuronLayers=3, batchSize=512, 
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        self.nb_epoch = nb_epoch
-        self.batch_size = batch
-        
+        if paramDict:
+            self.maxepoch = paramDict["maxepoch"]
+            self.learningRate = paramDict["learningRate"]
+            self.neuronArchitecture = paramDict["neuronArchitecture"]
+            self.batchSize = paramDict["batchSize"]
+            self.minImprovement = paramDict["minImprovement"]
+        else:
+            self.maxepoch = maxepoch
+            self.learningRate = learningRate
+            self.neuronArchitecture = neuronArchitecture
+            self.batchSize = batchSize
+            self.minImprovement = minImprovement
         return
 
         #######################################################################
@@ -88,7 +97,7 @@ class Regressor():
         #######################################################################
 
         
-    def fit(self, x, y):
+    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0):
         """
         Regressor training function
 
@@ -195,12 +204,13 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(): 
+def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidateThreshold=0.5, iterations=3): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
     in the Regressor class.
-
+    The approach is to start with very wide hyperparameters, and iteratively modify the hyperparamters for the next iteration
+    based on the top 'candidateThreshold' % of models in the current iteration. 
     Arguments:
         Add whatever inputs you need.
         
@@ -208,17 +218,30 @@ def RegressorHyperParameterSearch():
         The function should return your optimised hyper-parameters. 
 
     """
-
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
+    iteration = 1
+    while iteration < iterations:
+        xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
+        iteration += 1
+        model = model_selection.GridSearchCV(
+            estimator = Regressor(x),
+            param_grid = hyperparam,
+            scoring="neg_root_mean_squared_error",
+            cv=5,
+            verbose=2,
+            n_jobs=-1
+        )
+        model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
 
     return  # Return the chosen hyper parameters
 
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
-
+    #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+    #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
 
 
 def example_main():
@@ -233,6 +256,14 @@ def example_main():
     # Splitting input and output
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
+    #Hyperparameter tuning
+    baseparam = {
+        "maxepoch" : 1000, 
+        "learningRate" : [0.001, 0.01, 0.1, 1], 
+        "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
+        "batchSize" : [64, 128, 256, 512],
+        }
+    RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.1, 0.5, 3)
 
     # Training
     # This example trains on the whole available dataset. 
@@ -240,6 +271,7 @@ def example_main():
     # to make sure the model isn't overfitting
     regressor = Regressor(x_train, nb_epoch = 10)
     regressor.fit(x_train, y_train)
+    #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
 
     # Error
