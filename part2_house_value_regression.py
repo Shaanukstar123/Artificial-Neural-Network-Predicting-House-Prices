@@ -93,7 +93,7 @@ class Regressor():
         #######################################################################
 
         
-    def fit(self, x, y):
+    def fit(self, x, y, xValidation=None, yValidation=None):
         """
         Regressor training function
 
@@ -195,7 +195,8 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iter
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
     in the Regressor class.
-
+    The approach is to start with very wide hyperparameters, and iteratively modify the hyperparamters for the next iteration
+    based on the top 'candidateThreshold' % of models in the current iteration. 
     Arguments:
         Add whatever inputs you need.
         
@@ -208,15 +209,25 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iter
     #######################################################################
     iteration = 1
     while iteration < iterations:
-        iteration += 1
-        
+        xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
 
+        iteration += 1
+        model = model_selection.GridSearchCV(
+            estimator = Regressor(x),
+            param_grid = hyperparam,
+            scoring="neg_root_mean_squared_error",
+            cv=5,
+            verbose=2,
+            n_jobs=-1
+        )
+        model.fit(xTrain, yTrain, xValidation, yValidation)
     return  # Return the chosen hyper parameters
 
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
-
+    #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+    #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
 
 
 def example_main():
@@ -237,7 +248,7 @@ def example_main():
         "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
         "batchSize" : [64, 128, 256, 512],
-        "minImprovement" : 0.1, 
+        "minImprovement" : [0.1, 0.5], 
         }
     RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.5, 3)
 
