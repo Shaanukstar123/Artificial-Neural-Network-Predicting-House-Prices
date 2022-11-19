@@ -73,15 +73,15 @@ class Regressor():
             else:
                 x[col].fillna(x[col].median(), inplace=True)
 
-        print(x)
         
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
         x = x.join(proximity_column)
+        if training:
+            x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
 
-        x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
-        print(x)
-        return x, (y if isinstance(y, pd.DataFrame) else None)
+        #converts x and y to tensors before returning
+        return torch.from_numpy(x.values), (torch.from_numpy(y.values) if isinstance(y, pd.DataFrame) else None)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -105,12 +105,18 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-
-        batch_size = min(X.size()[0],self.batch_size) #For the case if remaining dataset is smaller than batch_size
-        #get random index list
-        return self
+        #batch_size = min(len(X),self.batch_size) #In case dataset is smaller than batch_size
+        #Mini-batch gradient descent:
+        for epoch in range(self.nb_epoch):
+            batch_list = torch.randperm(len(X))
+            print(X)
+            #Weird tensor results
+            #print(X[batch_list[0:4]])
+            for i in range(0,len(X),self.batch_size):
+                index = batch_list[i:i+ self.batch_size]
+                #print(X[index])
+        
 
         #######################################################################
         #                       ** END OF YOUR CODE **
