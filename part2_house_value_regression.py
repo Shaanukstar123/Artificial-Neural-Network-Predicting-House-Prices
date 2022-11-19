@@ -93,7 +93,7 @@ class Regressor():
         #######################################################################
 
         
-    def fit(self, x, y, xValidation=None, yValidation=None):
+    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0):
         """
         Regressor training function
 
@@ -190,7 +190,7 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iterations=3): 
+def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidateThreshold=0.5, iterations=3): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -210,7 +210,6 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iter
     iteration = 1
     while iteration < iterations:
         xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
-
         iteration += 1
         model = model_selection.GridSearchCV(
             estimator = Regressor(x),
@@ -220,7 +219,8 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.5, iter
             verbose=2,
             n_jobs=-1
         )
-        model.fit(xTrain, yTrain, xValidation, yValidation)
+        model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
+
     return  # Return the chosen hyper parameters
 
     #######################################################################
@@ -248,9 +248,8 @@ def example_main():
         "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
         "batchSize" : [64, 128, 256, 512],
-        "minImprovement" : [0.1, 0.5], 
         }
-    RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.5, 3)
+    RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.1, 0.5, 3)
 
     # Training
     # This example trains on the whole available dataset. 
