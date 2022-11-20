@@ -3,10 +3,11 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing, model_selection #For one-hot encoding and GridSearch for hyperparam tuning
+import torch.nn as nn
 
 class Regressor():
 
-    def __init__(self, x, maxepoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=512, minImprovement=0.1, paramDict=None):
+    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -30,14 +31,16 @@ class Regressor():
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
+        Adam_model = torch.nn.Sequential(nn.Linear(dim_in, dim_h),nn.ReLU(),nn.Linear(dim_h, dim_out))
+        
         if paramDict:
-            self.maxepoch = paramDict["maxepoch"]
+            self.nb_epoch = paramDict["nb_epoch"]
             self.learningRate = paramDict["learningRate"]
             self.neuronArchitecture = paramDict["neuronArchitecture"]
             self.batchSize = paramDict["batchSize"]
             self.minImprovement = paramDict["minImprovement"]
         else:
-            self.maxepoch = maxepoch
+            self.nb_epoch = nb_epoch
             self.learningRate = learningRate
             self.neuronArchitecture = neuronArchitecture
             self.batchSize = batchSize
@@ -88,6 +91,7 @@ class Regressor():
         x = x.join(proximity_column)
         if training:
             x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
+        #with pd.option_context('display.max_rows', None, 'display.max_columns', None):  #allows all rows to be printed
 
         #converts x and y to tensors before returning
         return torch.from_numpy(x.values), (torch.from_numpy(y.values) if isinstance(y, pd.DataFrame) else None)
@@ -97,7 +101,7 @@ class Regressor():
         #######################################################################
 
         
-    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0):
+    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0.01):
         """
         Regressor training function
 
@@ -115,17 +119,23 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-        #batch_size = min(len(X),self.batch_size) #In case dataset is smaller than batch_size
-        #Mini-batch gradient descent:
-        for epoch in range(self.nb_epoch):
-            batch_list = torch.randperm(len(X))
-            print(X)
-            #Weird tensor results
-            #print(X[batch_list[0:4]])
-            for i in range(0,len(X),self.batch_size):
-                index = batch_list[i:i+ self.batch_size]
-                #print(X[index])
         
+        #Mini-batch gradient descent:
+        torch.set_printoptions(profile="full")
+
+        for epoch in range(1):#self.nb_epoch):
+            batch_list = torch.randperm(len(X)) # generates random indices
+
+            for i in range(0,len(X),self.batchSize):
+                optimiser = torch.optim.Adam([var1, var2], lr=0.0001)
+                optimiser.zero_grad()
+
+                index = batch_list[i:i+ self.batchSize]
+                batch_x = X[index]
+                batch_y = Y[index]
+                prediction = self.predict(batch_x)
+                batch_loss = nn.MSELoss(prediction,batch_y)
+
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -221,19 +231,19 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
-    iteration = 1
-    while iteration < iterations:
-        xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
-        iteration += 1
-        model = model_selection.GridSearchCV(
-            estimator = Regressor(x),
-            param_grid = hyperparam,
-            scoring="neg_root_mean_squared_error",
-            cv=5,
-            verbose=2,
-            n_jobs=-1
-        )
-        model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
+    # iteration = 1
+    # while iteration < iterations:
+    #     xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
+    #     iteration += 1
+    #     model = model_selection.GridSearchCV(
+    #         estimator = Regressor(x),
+    #         param_grid = hyperparam,
+    #         scoring="neg_root_mean_squared_error",
+    #         cv=5,
+    #         verbose=2,
+    #         n_jobs=-1
+    #     )
+    #     model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
 
     return  # Return the chosen hyper parameters
 
@@ -258,7 +268,7 @@ def example_main():
     y_train = data.loc[:, [output_label]]
     #Hyperparameter tuning
     baseparam = {
-        "maxepoch" : 1000, 
+        "nb_epoch" : 1000, 
         "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
         "batchSize" : [64, 128, 256, 512],
@@ -284,3 +294,5 @@ if __name__ == "__main__":
 
 ## Sources: https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/
 ##          https://pandas.pydata.org/
+##          https://pytorch.org/docs/
+##          https://www.projectpro.io/recipes/optimize-function-adam-pytorch
