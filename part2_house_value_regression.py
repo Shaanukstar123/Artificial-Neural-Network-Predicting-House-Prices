@@ -31,8 +31,15 @@ class Regressor():
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        self.layer_list = self.get_layer_list(neuronArchitecture)
-        self.model = torch.nn.Sequential(*self.layer_list)#nn.Linear(dim_in, dim_h),nn.ReLU(),nn.Linear(dim_h, dim_out))
+        self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
+        self.output_layer = nn.Linear(neuronArchitecture[-2],neuronArchitecture[-1])
+        self.layers = nn.ModuleList()
+        self.layers.append(self.input_layer)
+        self.activation = nn.ReLU()
+        for i in range(1,len(neuronArchitecture)-1): #adds hidden layers to model
+            self.layers.append(nn.Linear(neuronArchitecture[i],neuronArchitecture[i+1]))
+
+        self.layers.append(self.output_layer)
         
         if paramDict:
             self.nb_epoch = paramDict["nb_epoch"]
@@ -129,17 +136,18 @@ class Regressor():
             batch_list = torch.randperm(len(X)) # generates random indices
 
             for i in range(0,len(X),self.batchSize):
-                optimiser = torch.optim.Adam(self.model.parameters(), lr=0.0001)
-                optimiser.zero_grad()
-
+                optimiser = torch.optim.Adam(nn.model.parameters(), lr=0.0001)
+               
                 index = batch_list[i:i+ self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.predict(batch_x)
                 batch_loss = nn.MSELoss(prediction,batch_y)
                 batch_loss.backward()
-                
+                optimiser.step()
+                optimiser.zero_grad()
 
+            
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -158,7 +166,10 @@ class Regressor():
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
-        return self.model(x)
+        for layer in self.layers:
+            prediction = layer(x)
+            prediction = nn.functional.relu(prediction)
+        return prediction
 
         #######################################################################
         #                       ** START OF YOUR CODE **
@@ -195,21 +206,6 @@ class Regressor():
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
-    @staticmethod
-    def get_layer_list(dims):
-        layers = [nn.Linear(9,dims[0])]
-        for i in range(1,len(dims)):
-            layers.append(nn.ReLU())
-            print(i,len(dims)-1)
-            if i == len(dims)-1:
-                
-                layers.append(nn.Linear(dims[i-1],1))
-            else:
-                layers.append(nn.Linear(dims[i-1],dims[i]))
-            
-        print(layers)
-        return layers
 
 def save_regressor(trained_model): 
     """ 
@@ -320,3 +316,4 @@ if __name__ == "__main__":
 ##          https://pytorch.org/docs/
 ##          https://www.projectpro.io/recipes/optimize-function-adam-pytorch
 ##          https://stackoverflow.com/questions/32896651/pass-multiple-arguments-in-form-of-tuple
+##          https://rubikscode.net/2021/08/02/pytorch-for-beginners-building-neural-networks/
