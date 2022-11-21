@@ -3,7 +3,9 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing, model_selection #For one-hot encoding and GridSearch for hyperparam tuning
-
+import collections
+import math
+import random
 class Regressor():
 
     def __init__(self, x, maxepoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=512, minImprovement=0.1, paramDict=None):
@@ -23,7 +25,6 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
         self.bin_labels  = preprocessing.LabelBinarizer()
         self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
         #nb_epoch = 1000, learningRate=0.01, neuroncount=8, neuronLayers=3, batchSize=512, 
@@ -43,7 +44,6 @@ class Regressor():
             self.batchSize = batchSize
             self.minImprovement = minImprovement
         return
-
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -148,7 +148,6 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
         X, _ = self._preprocessor(x, training = False) # Do not forget
         pass
 
@@ -202,15 +201,32 @@ def load_regressor():
     print("\nLoaded model in part2_model.pickle\n")
     return trained_model
 
+# Helper functions
+#This function will find the top two paramters and create a range between them
+def getTopTwo(inputList):
+    paramHeaders = {"learningRate" : 0, "neuronArchitecture" : 1, "batchSize" : 2}
+    params = [[] for i in range(len(paramHeaders))]
+    paramMode = dict{}
+    #Convert list of dictionaries to list per parameter
+    for description in inputList:
+        for key, value in description.items():
+            params[paramHeaders[key]].append(value)
+    #Invert the dictionary
+    paramInverted = {value: key for key, value in paramHeaders.items()}
+    #Obtain the two most common items
+    for index, value in enumerate(params):
+        mode = collections.Counter(params[index]).most_common(2)
+        paramMode[paramInverted[index]] = [i[0] for i in mode]
+    return paramMode
 
-
-def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidateThreshold=0.5, iterations=3): 
+def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidateThreshold=0.05, iterations=3, wideSearch=True): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
     in the Regressor class.
     The approach is to start with very wide hyperparameters, and iteratively modify the hyperparamters for the next iteration
-    based on the top 'candidateThreshold' % of models in the current iteration. 
+    based on the top 'candidateThreshold' % of models in the current iteration.
+    The primary goal of the first iteration is to determine how many layers of neurons should be used and the order of magntiude for the learning rate
     Arguments:
         Add whatever inputs you need.
         
@@ -221,7 +237,9 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
-    iteration = 1
+    iteration = 0
+    bestPerformer = 0
+    bestParams = None
     while iteration < iterations:
         xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
         iteration += 1
@@ -232,17 +250,58 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
             cv=5,
             verbose=2,
             n_jobs=-1
-        )
+            return_train_score = True
+            )
         model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
-
-    return  # Return the chosen hyper parameters
-
+        results = pd.DataFrame(model.cv_results_) #Get results
+        currentPerformer = results["mean_test_score"].max() #Find best performer from models
+        #If the newest iteration has a worse performance, terminate tuning and return the last one
+        if bestPerformer > currentPerformer:
+            return bestParams
+        bestPerformer = currentPerformer
+        bestParams = model.best_params_dict
+        #Get all models within 'candidateThreshold' % of best performance
+        results = results.loc[results["mean_test_score"] >= bestPerformer-candidateThreshold]
+        paramList = results["params"]
+        #Now, calculate all the new hyperparameters and prepare for next round
+        print("Iteration", iteration)
+        print("Found params:", paramList)
+        newParams = getTopTwo(paramList)
+        print("Optimum params:", newParams)
+        #On the first iteration, determine magnitude of learning rate and the amount of layers in the neural network
+        if iteration == 1:
+            #Determine the amount of layers - prefer less layers
+            layerCount = [len(x) for x in newParams["neuronArchitecture"]].min()
+            #Determine the magnitude of the learning rate 
+            if wideSearch and len(newParams["learningRate"][0]) >= 2:
+                learningMagnitude = [math.log(x, 10) for x in newParams["learningRate"][:2]].sum()/2
+            else:
+                learningMagnitude = math.log(newParams["learningRate"][0], 10)
+            print("Layercount:", layerCount, "Learning Magnitude:", learningMagnitude)
+        hyperparam = {"learningRate" : None, "neuronArchitecture" : [], "batchSize" : None}
+        hyperparam["learningRate"] = [10**random.uniform(learningMagnitude-0.3, learningMagnitude+0.3) for _ in range(4)]
+        #Neuron architecture
+        for i in range(4):
+            maxNeurons = 13
+            architecture = []
+            for j in range(layerCount):
+                #Ensure decreasing neurons
+                maxNeurons = random.randint(maxNeurons-3, maxNeurons)
+                architecture.append(maxNeurons)
+            hyperparam["neuronArchitecture"].append(architecture)
+        #Batchsize
+        if len(newParams["batchSize"][0]) >= 2:
+            batchMagnitude = [math.log(x, 2) for x in newParams["batchSize"][:2]].sum()/2
+        else:
+            batchMagnitude = math.log(newParams["batchSize"][0], 2)
+        hyperparam["batchSize"] = [2**random.uniform(batchMagnitude-0.3, batchMagnitude+0.3) for _ in range(4)]
+        print("New hyperparameters:", hyperparam)
+    return bestParams # Return the chosen hyper parameters
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
     #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
     #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
-
 
 def example_main():
 
@@ -260,11 +319,11 @@ def example_main():
     baseparam = {
         "maxepoch" : 1000, 
         "learningRate" : [0.001, 0.01, 0.1, 1], 
-        "neuronArchitecture" : [[12], [12,12], [12,12,12], [12,12,12,12]], 
+        "neuronArchitecture" : [[9], [9,9], [9,9,9], [9,9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
         }
-    RegressorHyperParameterSearch(x_train, y_train, baseparam, 0.1, 0.5, 3)
-
+    bestParams = RegressorHyperParameterSearch(x_train, y_train, baseparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
+    print("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
