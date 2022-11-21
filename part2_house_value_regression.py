@@ -7,7 +7,7 @@ import torch.nn as nn
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[9,9,9], batchSize=32, minImprovement=0.1, paramDict=None):
+    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[13,13,13], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -31,16 +31,21 @@ class Regressor():
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
-        self.output_layer = nn.Linear(neuronArchitecture[-2],neuronArchitecture[-1])
-        self.layers = nn.ModuleList()
-        self.layers.append(self.input_layer)
+        #self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
+        self.output_layer = nn.Linear(neuronArchitecture[-1],1)
+        self.all_layers = nn.ModuleList()
         self.activation = nn.ReLU()
-        for i in range(1,len(neuronArchitecture)-1): #adds hidden layers to model
-            self.layers.append(nn.Linear(neuronArchitecture[i],neuronArchitecture[i+1]))
+        #self.all_layers.append(self.input_layer)
+        #self.all_layers.append(nn.ReLU())
 
-        self.layers.append(self.output_layer)
-        
+        for i in range(len(neuronArchitecture)-1): #list of input and all hidden layers
+            self.all_layers.append(nn.Linear(neuronArchitecture[i],neuronArchitecture[i+1]))
+            self.all_layers.append(self.activation)
+
+        self.all_layers.append(self.output_layer)
+        self.model = nn.Sequential(*self.all_layers)
+        self.model.double()
+
         if paramDict:
             self.nb_epoch = paramDict["nb_epoch"]
             self.learningRate = paramDict["learningRate"]
@@ -128,7 +133,6 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-        
         #Mini-batch gradient descent:
         torch.set_printoptions(profile="full")
 
@@ -136,7 +140,8 @@ class Regressor():
             batch_list = torch.randperm(len(X)) # generates random indices
 
             for i in range(0,len(X),self.batchSize):
-                optimiser = torch.optim.Adam(nn.model.parameters(), lr=0.0001)
+                print("BATCH: ",X[0])
+                optimiser = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
                
                 index = batch_list[i:i+ self.batchSize]
                 batch_x = X[index]
@@ -166,10 +171,12 @@ class Regressor():
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
-        for layer in self.layers:
-            prediction = layer(x)
-            prediction = nn.functional.relu(prediction)
-        return prediction
+        return self.model(x)
+        # for layer in self.all_layers:
+        #     prediction = layer(x)
+        #     prediction = nn.functional.relu(prediction)
+        # prediction = self.output_layer(x)
+        # return prediction
 
         #######################################################################
         #                       ** START OF YOUR CODE **
