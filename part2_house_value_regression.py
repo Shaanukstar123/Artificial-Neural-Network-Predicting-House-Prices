@@ -7,7 +7,7 @@ import torch.nn as nn
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=32, minImprovement=0.1, paramDict=None):
+    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[9,9,9], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -31,7 +31,8 @@ class Regressor():
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        Adam_model = torch.nn.Sequential(nn.Linear(dim_in, dim_h),nn.ReLU(),nn.Linear(dim_h, dim_out))
+        self.layer_list = self.get_layer_list(neuronArchitecture)
+        self.model = torch.nn.Sequential(*self.layer_list)#nn.Linear(dim_in, dim_h),nn.ReLU(),nn.Linear(dim_h, dim_out))
         
         if paramDict:
             self.nb_epoch = paramDict["nb_epoch"]
@@ -50,6 +51,7 @@ class Regressor():
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
+
 
     def _preprocessor(self, x, y = None, training = False):
 
@@ -127,7 +129,7 @@ class Regressor():
             batch_list = torch.randperm(len(X)) # generates random indices
 
             for i in range(0,len(X),self.batchSize):
-                optimiser = torch.optim.Adam([var1, var2], lr=0.0001)
+                optimiser = torch.optim.Adam(self.model.parameters(), lr=0.0001)
                 optimiser.zero_grad()
 
                 index = batch_list[i:i+ self.batchSize]
@@ -135,6 +137,8 @@ class Regressor():
                 batch_y = Y[index]
                 prediction = self.predict(batch_x)
                 batch_loss = nn.MSELoss(prediction,batch_y)
+                batch_loss.backward()
+                
 
 
         #######################################################################
@@ -149,11 +153,12 @@ class Regressor():
         Arguments:
             x {pd.DataFrame} -- Raw input array of shape 
                 (batch_size, input_size).
-
+        
         Returns:
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
+        return self.model(x)
 
         #######################################################################
         #                       ** START OF YOUR CODE **
@@ -191,6 +196,20 @@ class Regressor():
         #                       ** END OF YOUR CODE **
         #######################################################################
 
+    @staticmethod
+    def get_layer_list(dims):
+        layers = [nn.Linear(9,dims[0])]
+        for i in range(1,len(dims)):
+            layers.append(nn.ReLU())
+            print(i,len(dims)-1)
+            if i == len(dims)-1:
+                
+                layers.append(nn.Linear(dims[i-1],1))
+            else:
+                layers.append(nn.Linear(dims[i-1],dims[i]))
+            
+        print(layers)
+        return layers
 
 def save_regressor(trained_model): 
     """ 
@@ -254,6 +273,8 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
 
 
+
+
 def example_main():
 
     output_label = "median_house_value"
@@ -289,6 +310,8 @@ def example_main():
     print("\nRegressor error: {}\n".format(error))
 
 
+        
+
 if __name__ == "__main__":
     example_main()
 
@@ -296,3 +319,4 @@ if __name__ == "__main__":
 ##          https://pandas.pydata.org/
 ##          https://pytorch.org/docs/
 ##          https://www.projectpro.io/recipes/optimize-function-adam-pytorch
+##          https://stackoverflow.com/questions/32896651/pass-multiple-arguments-in-form-of-tuple
