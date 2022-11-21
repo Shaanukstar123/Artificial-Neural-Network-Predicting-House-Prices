@@ -181,7 +181,7 @@ class ReluLayer(Layer):
                 input, of shape (batch_size, n_in).
         """
         
-        return np.dot(np.where(self._cache_current > 0, 1, 0), grad_z)
+        return np.multiply(np.where(self._cache_current > 0, 1, 0), grad_z)
 
 
 class LinearLayer(Layer):
@@ -254,7 +254,7 @@ class LinearLayer(Layer):
         self._grad_W_current = np.dot(self._cache_current, grad_z)
         self._grad_b_current = np.dot(np.ones(1, len(grad_z)), grad_z)
         
-        return np.dot(np.traspose(self._W), grad_z)
+        return np.dot(np.transpose(self._W), grad_z)
         
         
 
@@ -610,7 +610,7 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        return np.multiply(data, (self.max - self.min)) + self.xmin
+        return np.multiply(data, (self.max - self.min)) + self.min
 
         #######################################################################
         #                       ** END OF YOUR CODE **
