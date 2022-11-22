@@ -6,9 +6,11 @@ from sklearn import preprocessing, model_selection #For one-hot encoding and Gri
 import collections
 import math
 import random
+import torch.nn as nn
+
 class Regressor():
 
-    def __init__(self, x, maxepoch=1000, learningRate=0.01, neuronArchitecture=[8,8,8], batchSize=512, minImprovement=0.1, paramDict=None):
+    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[13,13,13], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -31,14 +33,30 @@ class Regressor():
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
+        #self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
+        self.output_layer = nn.Linear(neuronArchitecture[-1],1)
+        self.all_layers = nn.ModuleList()
+        self.activation = nn.ReLU(inplace=True)
+        #self.all_layers.append(self.input_layer)
+        #self.all_layers.append(nn.ReLU())
+
+        for i in range(len(neuronArchitecture)-1): #list of input and all hidden layers
+            self.all_layers.append(nn.Linear(neuronArchitecture[i],neuronArchitecture[i+1]))
+            self.all_layers.append(self.activation)
+
+        self.all_layers.append(self.output_layer)
+        #self.all_layers.append(self.activation)
+        self.model = nn.Sequential(*self.all_layers) #unpacks list as parameters for sequential layers
+        self.model.to(torch.float64)
+
         if paramDict:
-            self.maxepoch = paramDict["maxepoch"]
+            self.nb_epoch = paramDict["nb_epoch"]
             self.learningRate = paramDict["learningRate"]
             self.neuronArchitecture = paramDict["neuronArchitecture"]
             self.batchSize = paramDict["batchSize"]
             self.minImprovement = paramDict["minImprovement"]
         else:
-            self.maxepoch = maxepoch
+            self.nb_epoch = nb_epoch
             self.learningRate = learningRate
             self.neuronArchitecture = neuronArchitecture
             self.batchSize = batchSize
@@ -47,6 +65,7 @@ class Regressor():
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
+
 
     def _preprocessor(self, x, y = None, training = False):
 
@@ -88,6 +107,7 @@ class Regressor():
         x = x.join(proximity_column)
         if training:
             x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
+        #with pd.option_context('display.max_rows', None, 'display.max_columns', None):  #allows all rows to be printed
 
         #converts x and y to tensors before returning
         return torch.from_numpy(x.values), (torch.from_numpy(y.values) if isinstance(y, pd.DataFrame) else None)
@@ -97,7 +117,7 @@ class Regressor():
         #######################################################################
 
         
-    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0):
+    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0.01):
         """
         Regressor training function
 
@@ -115,18 +135,24 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-        #batch_size = min(len(X),self.batch_size) #In case dataset is smaller than batch_size
+        print(X)
         #Mini-batch gradient descent:
-        for epoch in range(self.nb_epoch):
-            batch_list = torch.randperm(len(X))
-            print(X)
-            #Weird tensor results
-            #print(X[batch_list[0:4]])
-            for i in range(0,len(X),self.batch_size):
-                index = batch_list[i:i+ self.batch_size]
-                #print(X[index])
-        
+        torch.set_printoptions(profile="full")
 
+        for epoch in range(1):#self.nb_epoch):
+            batch_list = torch.randperm(len(X)) # generates random indices
+
+            for i in range(0,len(X),self.batchSize):
+                optimiser = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
+                index = batch_list[i:i+ self.batchSize]
+                batch_x = X[index]
+                batch_y = Y[index]
+                prediction = self.predict(batch_x)
+                batch_loss = nn.MSELoss()(prediction,batch_y) #first set of parentheses after mseloss to prevent tensor bool error
+                batch_loss.backward()
+                optimiser.step()
+                optimiser.zero_grad()
+                
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -139,11 +165,17 @@ class Regressor():
         Arguments:
             x {pd.DataFrame} -- Raw input array of shape 
                 (batch_size, input_size).
-
+        
         Returns:
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
+        return self.model(x)
+        # for layer in self.all_layers:
+        #     prediction = layer(x)
+        #     prediction = nn.functional.relu(prediction)
+        # prediction = self.output_layer(x)
+        # return prediction
 
         #######################################################################
         #                       ** START OF YOUR CODE **
@@ -179,7 +211,6 @@ class Regressor():
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
 
 def save_regressor(trained_model): 
     """ 
@@ -303,6 +334,9 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
     #https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
 
+
+
+
 def example_main():
 
     output_label = "median_house_value"
@@ -317,7 +351,7 @@ def example_main():
     y_train = data.loc[:, [output_label]]
     #Hyperparameter tuning
     baseparam = {
-        "maxepoch" : 1000, 
+        "nb_epoch" : 1000, 
         "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[9], [9,9], [9,9,9], [9,9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
@@ -338,8 +372,14 @@ def example_main():
     print("\nRegressor error: {}\n".format(error))
 
 
+        
+
 if __name__ == "__main__":
     example_main()
 
 ## Sources: https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/
 ##          https://pandas.pydata.org/
+##          https://pytorch.org/docs/
+##          https://www.projectpro.io/recipes/optimize-function-adam-pytorch
+##          https://stackoverflow.com/questions/32896651/pass-multiple-arguments-in-form-of-tuple
+##          https://rubikscode.net/2021/08/02/pytorch-for-beginners-building-neural-networks/
