@@ -10,7 +10,13 @@ import torch.nn as nn
 
 class Regressor():
 
-    def __init__(self, x, nb_epoch=1000, learningRate=0.01, neuronArchitecture=[13,13,13], batchSize=32, minImprovement=0.1, paramDict=None):
+    @staticmethod
+    def init_weights(layer):
+        if isinstance(layer, nn.Linear):
+            nn.init.xavier_uniform_(layer.weight)
+            layer.bias.data.fill_(0)
+
+    def __init__(self, x, nb_epoch=3000, learningRate=0.01, neuronArchitecture=[13], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -34,20 +40,19 @@ class Regressor():
         self.input_size = X.shape[1]
         self.output_size = 1
         #self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
-        self.output_layer = nn.Linear(neuronArchitecture[-1],1)
-        self.all_layers = nn.ModuleList()
-        self.activation = nn.ReLU(inplace=True)
-        #self.all_layers.append(self.input_layer)
-        #self.all_layers.append(nn.ReLU())
+        self.output_layer = nn.Linear(in_features=neuronArchitecture[-1],out_features=1)
+        self.layer_list = []
 
         for i in range(len(neuronArchitecture)-1): #list of input and all hidden layers
-            self.all_layers.append(nn.Linear(neuronArchitecture[i],neuronArchitecture[i+1]))
-            self.all_layers.append(self.activation)
+            self.layer_list.append(nn.Linear(in_features=neuronArchitecture[i],out_features=neuronArchitecture[i+1]))
+            self.layer_list.append(nn.ReLU())
+        self.layer_list.append(self.output_layer)
+        #self.layer_list.append(nn.ReLU())
 
-        self.all_layers.append(self.output_layer)
-        #self.all_layers.append(self.activation)
-        self.model = nn.Sequential(*self.all_layers) #unpacks list as parameters for sequential layers
+        self.model = nn.Sequential(*self.layer_list) #unpacks list as parameters for sequential layers
+        self.model.apply(self.init_weights)
         self.model.to(torch.float64)
+        self.loss = nn.MSELoss()
 
         if paramDict:
             self.nb_epoch = paramDict["nb_epoch"]
@@ -135,23 +140,39 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-        print(X)
+        #print(X)
         #Mini-batch gradient descent:
         torch.set_printoptions(profile="full")
 
-        for epoch in range(1):#self.nb_epoch):
+        for epoch in range(self.nb_epoch):
             batch_list = torch.randperm(len(X)) # generates random indices
 
             for i in range(0,len(X),self.batchSize):
-                optimiser = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
-                index = batch_list[i:i+ self.batchSize]
+                print("batch number:", i//self.batchSize, "of", len(X)//self.batchSize, end=" ")
+                network = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
+                network.zero_grad()
+                index = batch_list[i:i+self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.predict(batch_x)
-                batch_loss = nn.MSELoss()(prediction,batch_y) #first set of parentheses after mseloss to prevent tensor bool error
+                
+                batch_loss = self.loss(prediction,batch_y)#wrapper function
+                #if epoch == 0 and i==0:
+                    #print("before: ")
+                    #print(f"Pred: {(prediction[0])}actual: {batch_y[0]}")
+                #if epoch == self.nb_epoch-1 and i==0:
+                    #print("After: ")
+                print(f"Pred: {(int(prediction[3]))} actual: {int(batch_y[3])}, factor: {float(prediction[3]/batch_y[3])}", end = ' ')
+                rmse = prediction-batch_y
+                total = 0
+                for element in rmse:
+                    total += element**2
+                total = math.sqrt(total/len(prediction))
+                print("RMSE:", total)
+                #print(f"Pred: {(batch_y-prediction)}")# actual: {batch_y}")
                 batch_loss.backward()
-                optimiser.step()
-                optimiser.zero_grad()
+                network.step()
+                
                 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -170,8 +191,7 @@ class Regressor():
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
-        return self.model(x)
-        # for layer in self.all_layers:
+        # for layer in self.layer_list:
         #     prediction = layer(x)
         #     prediction = nn.functional.relu(prediction)
         # prediction = self.output_layer(x)
@@ -180,9 +200,7 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        X, _ = self._preprocessor(x, training = False) # Do not forget
-        pass
-
+        return self.model(x)
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
