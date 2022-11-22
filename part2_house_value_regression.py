@@ -16,7 +16,7 @@ class Regressor():
             nn.init.xavier_uniform_(layer.weight)
             layer.bias.data.fill_(0)
 
-    def __init__(self, x, nb_epoch=3000, learningRate=0.01, neuronArchitecture=[13], batchSize=32, minImprovement=0.1, paramDict=None):
+    def __init__(self, x, nb_epoch=3000, learningRate=0.01, neuronArchitecture=[13,13,13], batchSize=32, minImprovement=0.1, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
