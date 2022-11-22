@@ -34,7 +34,7 @@ class Regressor():
         #self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
         self.output_layer = nn.Linear(neuronArchitecture[-1],1)
         self.all_layers = nn.ModuleList()
-        self.activation = nn.ReLU()
+        self.activation = nn.ReLU(inplace=True)
         #self.all_layers.append(self.input_layer)
         #self.all_layers.append(nn.ReLU())
 
@@ -43,8 +43,9 @@ class Regressor():
             self.all_layers.append(self.activation)
 
         self.all_layers.append(self.output_layer)
-        self.model = nn.Sequential(*self.all_layers)
-        self.model.double()
+        #self.all_layers.append(self.activation)
+        self.model = nn.Sequential(*self.all_layers) #unpacks list as parameters for sequential layers
+        self.model.to(torch.float64)
 
         if paramDict:
             self.nb_epoch = paramDict["nb_epoch"]
@@ -133,6 +134,7 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+        print(X)
         #Mini-batch gradient descent:
         torch.set_printoptions(profile="full")
 
@@ -140,20 +142,16 @@ class Regressor():
             batch_list = torch.randperm(len(X)) # generates random indices
 
             for i in range(0,len(X),self.batchSize):
-                print("BATCH: ",X[0])
                 optimiser = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
-               
                 index = batch_list[i:i+ self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.predict(batch_x)
-                batch_loss = nn.MSELoss(prediction,batch_y)
+                batch_loss = nn.MSELoss()(prediction,batch_y) #first set of parentheses after mseloss to prevent tensor bool error
                 batch_loss.backward()
                 optimiser.step()
                 optimiser.zero_grad()
-
-            
-
+                
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
