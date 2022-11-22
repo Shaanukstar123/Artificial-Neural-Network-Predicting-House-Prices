@@ -237,7 +237,7 @@ def load_regressor():
 def getTopTwo(inputList):
     paramHeaders = {"learningRate" : 0, "neuronArchitecture" : 1, "batchSize" : 2}
     params = [[] for i in range(len(paramHeaders))]
-    paramMode = dict{}
+    paramMode = dict()
     #Convert list of dictionaries to list per parameter
     for description in inputList:
         for key, value in description.items():
@@ -280,7 +280,7 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
             scoring="neg_root_mean_squared_error",
             cv=5,
             verbose=2,
-            n_jobs=-1
+            n_jobs=-1,
             return_train_score = True
             )
         model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
@@ -356,8 +356,8 @@ def example_main():
         "neuronArchitecture" : [[9], [9,9], [9,9,9], [9,9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
         }
-    bestParams = RegressorHyperParameterSearch(x_train, y_train, baseparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
-    print("Optimum parameters:", bestParams)
+    #bestParams = RegressorHyperParameterSearch(x_train, y_train, baseparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
+    #print("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
