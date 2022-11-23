@@ -9,14 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-
-    @staticmethod
-    def init_weights(layer):
-        if isinstance(layer, nn.Linear):
-            nn.init.xavier_uniform_(layer.weight)
-            layer.bias.data.fill_(0)
-
-    def __init__(self, x, nb_epoch=3000, learningRate=0.01, neuronArchitecture=[13,13,13], batchSize=32, minImprovement=0.1, paramDict=None):
+    def __init__(self, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -33,45 +26,46 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        #Hyperparameter setting
+        self.minImprovement = 0.1
+        if paramDict is None:
+            #Default values
+            paramDict = {
+            "nb_epoch" : 500, 
+            "learningRate" : 0.1,
+            "neuronArchitecture" : [13, 9], 
+            "batchSize" : 128
+            }
+        # self.paramDict = paramDict
+        # self.nb_epoch = paramDict["nb_epoch"]
+        # self.learningRate = paramDict["learningRate"]
+        # self.neuronArchitecture = paramDict["neuronArchitecture"]
+        # self.batchSize = paramDict["batchSize"]
+        self.nb_epoch = 500
+        self.learningRate = 0.01
+        self.neuronArchitecture = [13,9]
+        self.batchSize = 32
+        #Ensure first layer contains 13 neurons to match input feature size
+        self.neuronArchitecture = [13] + self.neuronArchitecture 
+        #Convert string labels to numerical
         self.bin_labels  = preprocessing.LabelBinarizer()
         self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
-        #nb_epoch = 1000, learningRate=0.01, neuroncount=8, neuronLayers=3, batchSize=512, 
-        X, _ = self._preprocessor(x, training = True)
-        self.input_size = X.shape[1]
-        self.output_size = 1
-        #self.input_layer = nn.Linear(neuronArchitecture[0],neuronArchitecture[1])
-        self.output_layer = nn.Linear(in_features=neuronArchitecture[-1],out_features=1)
+        #Neuron architecture
+        self.output_layer = nn.Linear(in_features=self.neuronArchitecture[-1],out_features=1)
         self.layer_list = []
-
-        for i in range(len(neuronArchitecture)-1): #list of input and all hidden layers
-            self.layer_list.append(nn.Linear(in_features=neuronArchitecture[i],out_features=neuronArchitecture[i+1]))
+        for i in range(len(self.neuronArchitecture)-1): #list of input and all hidden layers
+            self.layer_list.append(nn.Linear(in_features=self.neuronArchitecture[i],out_features=self.neuronArchitecture[i+1]))
             self.layer_list.append(nn.ReLU())
         self.layer_list.append(self.output_layer)
-        #self.layer_list.append(nn.ReLU())
-
         self.model = nn.Sequential(*self.layer_list) #unpacks list as parameters for sequential layers
         self.model.apply(self.init_weights)
         self.model.to(torch.float64)
+        #Loss function
         self.loss = nn.MSELoss()
-
-        if paramDict:
-            self.nb_epoch = paramDict["nb_epoch"]
-            self.learningRate = paramDict["learningRate"]
-            self.neuronArchitecture = paramDict["neuronArchitecture"]
-            self.batchSize = paramDict["batchSize"]
-            self.minImprovement = paramDict["minImprovement"]
-        else:
-            self.nb_epoch = nb_epoch
-            self.learningRate = learningRate
-            self.neuronArchitecture = neuronArchitecture
-            self.batchSize = batchSize
-            self.minImprovement = minImprovement
         return
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
-
     def _preprocessor(self, x, y = None, training = False):
 
         """ 
@@ -105,24 +99,22 @@ class Regressor():
                 x[col].fillna(x[col].mode()[0], inplace=True)
             else:
                 x[col].fillna(x[col].median(), inplace=True)
-
-        
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
         x = x.drop(columns="ocean_proximity",axis = 1)
         x = x.join(proximity_column)
         if training:
-            x=(x-x.min())/(x.max()-x.min()) #Normalises numerical data from a scale of 0-1
-        #with pd.option_context('display.max_rows', None, 'display.max_columns', None):  #allows all rows to be printed
-
+            #Determine scaling factors
+            self.xMin = x.min()
+            self.xMax = x.max()
+            self.xRange = self.xMax-self.xMin
+        #Normalises numerical data from a scale of 0-1
+        x = (x-self.xMin)/(self.xMax-self.xMin)
         #converts x and y to tensors before returning
         return torch.from_numpy(x.values), (torch.from_numpy(y.values) if isinstance(y, pd.DataFrame) else None)
-
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
-        
-    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0.01):
+    def fit(self, x, y, xValidation=None, yValidation=None, minImprovement=0.03):
         """
         Regressor training function
 
@@ -139,41 +131,43 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
-        #print(X)
+        #Preprocess training data to generate scalars
+        X, Y = self._preprocessor(x, y = y, training = True)
         #Mini-batch gradient descent:
         torch.set_printoptions(profile="full")
-
-        for epoch in range(self.nb_epoch):
+        currEpoc = 0
+        epochError = math.inf
+        while currEpoc < self.nb_epoch:
             batch_list = torch.randperm(len(X)) # generates random indices
-
             for i in range(0,len(X),self.batchSize):
-                print("batch number:", i//self.batchSize, "of", len(X)//self.batchSize, end=" ")
+                #print("batch number:", i//self.batchSize, "of", len(X)//self.batchSize, end=" ")
                 network = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
                 network.zero_grad()
                 index = batch_list[i:i+self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.predict(batch_x)
-                
                 batch_loss = self.loss(prediction,batch_y)#wrapper function
-                #if epoch == 0 and i==0:
-                    #print("before: ")
-                    #print(f"Pred: {(prediction[0])}actual: {batch_y[0]}")
-                #if epoch == self.nb_epoch-1 and i==0:
-                    #print("After: ")
-                print(f"Pred: {(int(prediction[3]))} actual: {int(batch_y[3])}, factor: {float(prediction[3]/batch_y[3])}", end = ' ')
-                rmse = prediction-batch_y
-                total = 0
-                for element in rmse:
-                    total += element**2
-                total = math.sqrt(total/len(prediction))
-                print("RMSE:", total)
+                #print(f"Pred: {(int(prediction[3]))} actual: {int(batch_y[3])}, factor: {float(prediction[3]/batch_y[3])}", end = ' ')
+                # rmse = prediction-batch_y
+                # total = 0
+                # for element in rmse:
+                #     total += element**2
+                # total = math.sqrt(total/len(prediction))
+                # print("RMSE:", total)
                 #print(f"Pred: {(batch_y-prediction)}")# actual: {batch_y}")
                 batch_loss.backward()
                 network.step()
-                
-                
+            currEpoc += 1
+            #Use the validation set to implement early stopping - used during hyperparamter tuning
+            # if xValidation is not None:
+            #     newError = self.score(x, y)
+            #     if 1-(newError/epochError) < minImprovement:
+            #         print("Reached epoch cycle:", currEpoc, "with error:", newError)
+            #         break
+            #     epochError = newError
+        #print(self.score(X, Y, False))
+        return
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -191,12 +185,6 @@ class Regressor():
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
 
         """
-        # for layer in self.layer_list:
-        #     prediction = layer(x)
-        #     prediction = nn.functional.relu(prediction)
-        # prediction = self.output_layer(x)
-        # return prediction
-
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
@@ -222,14 +210,31 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
-        X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        return 0 # Replace this code with your own
-
+        X, Y = self._preprocessor(x, y)
+        yPred = self.predict(X)
+        diff = yPred-Y
+        #Calculate RMSE
+        total = 0
+        for element in diff:
+            total += element**2
+        return math.sqrt(total/len(diff))
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
 
+    # All helper functions in class
+    @staticmethod
+    def init_weights(layer):
+        if isinstance(layer, nn.Linear):
+            nn.init.xavier_uniform_(layer.weight)
+            layer.bias.data.fill_(0)
+    
+    def earlyStop(self, validationLoss, minImprovement):
+        pass
+
+    def get_params(self):
+        return self.paramDict
+    
 def save_regressor(trained_model): 
     """ 
     Utility function to save the trained regressor model in part2_model.pickle.
@@ -295,13 +300,13 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
         model = model_selection.GridSearchCV(
             estimator = Regressor(x),
             param_grid = hyperparam,
-            scoring="neg_root_mean_squared_error",
+            scoring="neg_root_mean_squared_error", #Scoring metric means lower is better
             cv=5,
             verbose=2,
             n_jobs=-1,
             return_train_score = True
             )
-        model.fit(xTrain, yTrain, xValidation, yValidation, minImprovement)
+        model.fit(xTrain, yTrain, xValidation=xValidation, yvValidation=yValidation, minImprovement=minImprovement)
         results = pd.DataFrame(model.cv_results_) #Get results
         currentPerformer = results["mean_test_score"].max() #Find best performer from models
         #If the newest iteration has a worse performance, terminate tuning and return the last one
@@ -368,19 +373,19 @@ def example_main():
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
     #Hyperparameter tuning
-    baseparam = {
+    hyperparam = {
         "nb_epoch" : 1000, 
         "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[9], [9,9], [9,9,9], [9,9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
         }
-    #bestParams = RegressorHyperParameterSearch(x_train, y_train, baseparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
+    #bestParams = RegressorHyperParameterSearch(x_train, y_train, hyperparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
     #print("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 10)
+    regressor = Regressor()
     regressor.fit(x_train, y_train)
     #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
@@ -401,3 +406,4 @@ if __name__ == "__main__":
 ##          https://www.projectpro.io/recipes/optimize-function-adam-pytorch
 ##          https://stackoverflow.com/questions/32896651/pass-multiple-arguments-in-form-of-tuple
 ##          https://rubikscode.net/2021/08/02/pytorch-for-beginners-building-neural-networks/
+##          https://scikit-learn.org/stable/developers/develop.html
