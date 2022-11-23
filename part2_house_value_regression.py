@@ -84,7 +84,6 @@ class Regressor():
         x.reset_index(drop=True, inplace=True)
         x = x.drop(columns="ocean_proximity",axis = 0)
         x = x.join(proximity_column)
-        print(x)
         if training:
             #Determine scaling factors
             self.xMin = x.min()
