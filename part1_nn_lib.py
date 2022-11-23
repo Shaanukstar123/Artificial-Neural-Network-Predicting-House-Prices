@@ -305,17 +305,22 @@ class MultiLayerNetwork(object):
         layer_count = len(neurons)
         for i in range(layer_count):
             if(i == 0):
+                #print("Linear Layer")
                 self._layers.append(LinearLayer(input_dim, neurons[i]))
             
             else:
+                #print("Linear Layer")
                 self._layers.append(LinearLayer(neurons[i-1], neurons[i]))
 
             if(activations[i] == "relu"):
+                #print("ReLu")
                 self._layers.append(ReluLayer())
             
             else:
                 # sigmoid
+                #print("Sigmoid")
                 self._layers.append(SigmoidLayer())
+
                 
 
 
@@ -387,7 +392,14 @@ class MultiLayerNetwork(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
         for l in range(len(self._layers)-2, -1, -2):
+            # print("Len of array is ", len(self._layers))
+
+            # if(type(self._layers[l]) is LinearLayer):
+            #     print(f"{l} linear layer")
+
             self._layers[l].update_params(learning_rate)
+
+        
         
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -512,21 +524,34 @@ class Trainer(object):
         #######################################################################
 
         for i in range(self.nb_epoch):
-            if(self.shuffle_flag):
-                self.shuffle(input_dataset, target_dataset)
-                
-            for j in range(0, len(input_dataset), self.batch_size):
-                # split into batches
-                input_batch = input_dataset[j:j+self.batch_size]
-                target_batch = target_dataset[j:j+self.batch_size]
-                # forward pass
-                output = self.network.forward(input_batch)
-                # compute loss
-                self._loss_layer.forward(output, target_batch)
-                # backward pass
+
+            number_of_batches = int(input_dataset.shape[0] / self.batch_size)
+            input_batches = np.array_split(input_dataset, number_of_batches)
+            target_batches = np.array_split(target_dataset, number_of_batches)
+
+            for i in range(0, number_of_batches):
+                output = self.network.forward(input_batches[i])
+                self._loss_layer.forward(output,target_batches[i])
                 self.network.backward(self._loss_layer.backward())
-                # update params
                 self.network.update_params(self.learning_rate)
+
+
+            # if(self.shuffle_flag):
+            #     Trainer.shuffle(input_dataset, target_dataset)
+                
+            # for j in range(0, len(input_dataset), self.batch_size):
+            #     # split into batches
+            #     input_batch = input_dataset[j:j+self.batch_size]
+            #     target_batch = target_dataset[j:j+self.batch_size]
+            #     # forward pass
+            #     output = self.network.forward(input_batch)
+            #     # compute loss
+            #     self._loss_layer.forward(output, target_batch)
+            #     # backward pass
+            #     self.network.backward(self._loss_layer.backward())
+            #     # update params
+            #     self.network.update_params(self.learning_rate)
+
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -627,7 +652,7 @@ def example_main():
     activations = ["relu", "identity"]
     net = MultiLayerNetwork(input_dim, neurons, activations)
 
-    dat = np.loadtxt("iris.dat")
+    dat = np.loadtxt("/Users/indraneel/projects/Decision-Tree-Coursework/p2/Neural_Networks_107/iris.dat")
     np.random.shuffle(dat)
 
     x = dat[:, :4]
