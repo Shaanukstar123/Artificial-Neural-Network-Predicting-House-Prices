@@ -39,10 +39,10 @@ class Regressor():
         self.paramDict = paramDict
         self.set_params(**self.paramDict)
         #Convert string labels to numerical
-        self.bin_labels  = preprocessing.LabelBinarizer()
-        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
+        self.testing_labels = None
+
         #Loss function
-        self.loss = nn.MSELoss()
+        #self.loss = 
         return
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -80,10 +80,23 @@ class Regressor():
                 x[col].fillna(x[col].mode()[0], inplace=True)
             else:
                 x[col].fillna(x[col].median(), inplace=True)
-        proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
+
+        #binarises textual elements
+        if training:
+            training_labels = preprocessing.LabelBinarizer()
+            proximity_column  = pd.DataFrame(training_labels.fit_transform(x["ocean_proximity"]))
+            self.testing_labels = training_labels
+        else:
+            #uses saved binarizer from training in case testing data doesn't contain all ocean proximity classes
+            proximity_column  = pd.DataFrame(self.testing_labels.transform(x["ocean_proximity"])) 
+
+
+        print("proximity_col: ",proximity_column)
         x.reset_index(drop=True, inplace=True)
         x = x.drop(columns="ocean_proximity",axis = 0)
         x = x.join(proximity_column)
+        print("Postprocessed")
+        print(x)
         if training:
             #Determine scaling factors
             self.xMin = x.min()
@@ -143,7 +156,8 @@ class Regressor():
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.model(batch_x)
-                batch_loss = self.loss(prediction,batch_y)#wrapper function
+                batch_loss = nn.MSELoss()(prediction,batch_y) # MSELoss is a wrapper function
+
                 #print(f"Pred: {(int(prediction[3]))} actual: {int(batch_y[3])}, factor: {float(prediction[3]/batch_y[3])}", end = ' ')
                 # rmse = prediction-batch_y
                 # total = 0
@@ -376,6 +390,8 @@ def example_main():
     # Splitting input and output
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
+    sample = x_train.iloc[0:2]
+    print(sample)
     #Hyperparameter tuning
     hyperparam = {
         "nb_epoch" : [10], 
@@ -391,6 +407,8 @@ def example_main():
     # to make sure the model isn't overfitting
     regressor = Regressor(x_train)
     regressor.fit(x_train, y_train)
+    print()
+    print(regressor.predict(sample))
     #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
 
