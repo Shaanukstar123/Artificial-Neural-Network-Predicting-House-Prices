@@ -9,7 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-    def __init__(self, paramDict=None):
+    def __init__(self, nb_epoch=100, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -31,35 +31,13 @@ class Regressor():
         if paramDict is None:
             #Default values
             paramDict = {
-            "nb_epoch" : 500, 
-            "learningRate" : 0.1,
-            "neuronArchitecture" : [13, 9], 
-            "batchSize" : 128
+            "nb_epoch" : nb_epoch, 
+            "learningRate" : learningRate,
+            "neuronArchitecture" : neuronArchitecture, 
+            "batchSize" : batchSize
             }
-        # self.paramDict = paramDict
-        # self.nb_epoch = paramDict["nb_epoch"]
-        # self.learningRate = paramDict["learningRate"]
-        # self.neuronArchitecture = paramDict["neuronArchitecture"]
-        # self.batchSize = paramDict["batchSize"]
-        self.nb_epoch = 500
-        self.learningRate = 0.01
-        self.neuronArchitecture = [13,9]
-        self.batchSize = 32
-        #Ensure first layer contains 13 neurons to match input feature size
-        self.neuronArchitecture = [13] + self.neuronArchitecture 
-        #Convert string labels to numerical
-        self.bin_labels  = preprocessing.LabelBinarizer()
-        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
-        #Neuron architecture
-        self.output_layer = nn.Linear(in_features=self.neuronArchitecture[-1],out_features=1)
-        self.layer_list = []
-        for i in range(len(self.neuronArchitecture)-1): #list of input and all hidden layers
-            self.layer_list.append(nn.Linear(in_features=self.neuronArchitecture[i],out_features=self.neuronArchitecture[i+1]))
-            self.layer_list.append(nn.ReLU())
-        self.layer_list.append(self.output_layer)
-        self.model = nn.Sequential(*self.layer_list) #unpacks list as parameters for sequential layers
-        self.model.apply(self.init_weights)
-        self.model.to(torch.float64)
+        self.paramDict = paramDict
+        self.set_params(**self.paramDict)
         #Loss function
         self.loss = nn.MSELoss()
         return
@@ -131,6 +109,22 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        #Create network
+        #Ensure first layer contains 13 neurons to match input feature size
+        self.neuronArchitecture = [13] + self.neuronArchitecture
+        #Convert string labels to numerical
+        self.bin_labels  = preprocessing.LabelBinarizer()
+        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
+        #Neuron architecture
+        self.output_layer = nn.Linear(in_features=self.neuronArchitecture[-1],out_features=1)
+        self.layer_list = []
+        for i in range(len(self.neuronArchitecture)-1): #list of input and all hidden layers
+            self.layer_list.append(nn.Linear(in_features=self.neuronArchitecture[i],out_features=self.neuronArchitecture[i+1]))
+            self.layer_list.append(nn.ReLU())
+        self.layer_list.append(self.output_layer)
+        self.model = nn.Sequential(*self.layer_list) #unpacks list as parameters for sequential layers
+        self.model.apply(self.init_weights)
+        self.model.to(torch.float64)
         #Preprocess training data to generate scalars
         X, Y = self._preprocessor(x, y = y, training = True)
         #Mini-batch gradient descent:
@@ -139,6 +133,7 @@ class Regressor():
         epochError = math.inf
         while currEpoc < self.nb_epoch:
             batch_list = torch.randperm(len(X)) # generates random indices
+            print(currEpoc, end='-')
             for i in range(0,len(X),self.batchSize):
                 #print("batch number:", i//self.batchSize, "of", len(X)//self.batchSize, end=" ")
                 network = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
@@ -146,7 +141,7 @@ class Regressor():
                 index = batch_list[i:i+self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
-                prediction = self.predict(batch_x)
+                prediction = self.model(batch_x)
                 batch_loss = self.loss(prediction,batch_y)#wrapper function
                 #print(f"Pred: {(int(prediction[3]))} actual: {int(batch_y[3])}, factor: {float(prediction[3]/batch_y[3])}", end = ' ')
                 # rmse = prediction-batch_y
@@ -188,7 +183,11 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        return self.model(x)
+        print(x)
+        X, _ = self._preprocessor(x)
+        print(X)
+        output = self.model(X).detach().numpy()
+        return output
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -211,7 +210,7 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
         X, Y = self._preprocessor(x, y)
-        yPred = self.predict(X)
+        yPred = self.model(X)
         diff = yPred-Y
         #Calculate RMSE
         total = 0
@@ -232,9 +231,14 @@ class Regressor():
     def earlyStop(self, validationLoss, minImprovement):
         pass
 
-    def get_params(self):
+    def get_params(self, deep=False):
         return self.paramDict
     
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+        return self
+
 def save_regressor(trained_model): 
     """ 
     Utility function to save the trained regressor model in part2_model.pickle.
@@ -298,22 +302,22 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
         xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
         iteration += 1
         model = model_selection.GridSearchCV(
-            estimator = Regressor(x),
+            estimator = Regressor(),
             param_grid = hyperparam,
             scoring="neg_root_mean_squared_error", #Scoring metric means lower is better
-            cv=5,
+            cv=2,
             verbose=2,
-            n_jobs=-1,
+            n_jobs=5,
             return_train_score = True
             )
-        model.fit(xTrain, yTrain, xValidation=xValidation, yvValidation=yValidation, minImprovement=minImprovement)
+        model.fit(xTrain, yTrain, xValidation=xValidation, yValidation=yValidation, minImprovement=minImprovement)
         results = pd.DataFrame(model.cv_results_) #Get results
         currentPerformer = results["mean_test_score"].max() #Find best performer from models
         #If the newest iteration has a worse performance, terminate tuning and return the last one
         if bestPerformer > currentPerformer:
             return bestParams
         bestPerformer = currentPerformer
-        bestParams = model.best_params_dict
+        bestParams = model.best_params_
         #Get all models within 'candidateThreshold' % of best performance
         results = results.loc[results["mean_test_score"] >= bestPerformer-candidateThreshold]
         paramList = results["params"]
@@ -374,12 +378,12 @@ def example_main():
     y_train = data.loc[:, [output_label]]
     #Hyperparameter tuning
     hyperparam = {
-        "nb_epoch" : 1000, 
-        "learningRate" : [0.001, 0.01, 0.1, 1], 
-        "neuronArchitecture" : [[9], [9,9], [9,9,9], [9,9,9,9]], 
+        "nb_epoch" : [10], 
+        "learningRate" : [0.001, 0.01, 0.1], 
+        "neuronArchitecture" : [[9], [9,9], [9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
         }
-    #bestParams = RegressorHyperParameterSearch(x_train, y_train, hyperparam, minImprovement=0.01, candidateThreshold=0.05, iterations=3)
+    #bestParams = RegressorHyperParameterSearch(x_train, y_train, hyperparam, minImprovement=0.01, candidateThreshold=0.05, iterations=2)
     #print("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
