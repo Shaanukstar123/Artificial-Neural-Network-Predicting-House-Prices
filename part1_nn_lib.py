@@ -136,7 +136,9 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        return grad_z * self.forward(self._cache_current) * (1 - self.forward(self._cache_current))
+        y = self._cache_current
+        sigmoid =  1 / (1+ np.exp(-y))
+        return grad_z * sigmoid * (1 - sigmoid)
 
 
 class ReluLayer(Layer):
