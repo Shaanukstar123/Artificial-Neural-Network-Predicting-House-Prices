@@ -9,7 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-    def __init__(self, nb_epoch=100, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, paramDict=None):
+    def __init__(self, x=None, nb_epoch=10, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -38,6 +38,9 @@ class Regressor():
             }
         self.paramDict = paramDict
         self.set_params(**self.paramDict)
+        #Convert string labels to numerical
+        self.bin_labels  = preprocessing.LabelBinarizer()
+        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
         #Loss function
         self.loss = nn.MSELoss()
         return
@@ -78,7 +81,8 @@ class Regressor():
             else:
                 x[col].fillna(x[col].median(), inplace=True)
         proximity_column  = pd.DataFrame(self.bin_labels.fit_transform(x["ocean_proximity"]))
-        x = x.drop(columns="ocean_proximity",axis = 1)
+        x.reset_index(drop=True, inplace=True)
+        x = x.drop(columns="ocean_proximity",axis = 0)
         x = x.join(proximity_column)
         if training:
             #Determine scaling factors
@@ -86,7 +90,7 @@ class Regressor():
             self.xMax = x.max()
             self.xRange = self.xMax-self.xMin
         #Normalises numerical data from a scale of 0-1
-        x = (x-self.xMin)/(self.xMax-self.xMin)
+        x = (x-self.xMin)/(self.xRange)
         #converts x and y to tensors before returning
         return torch.from_numpy(x.values), (torch.from_numpy(y.values) if isinstance(y, pd.DataFrame) else None)
         #######################################################################
@@ -112,9 +116,6 @@ class Regressor():
         #Create network
         #Ensure first layer contains 13 neurons to match input feature size
         self.neuronArchitecture = [13] + self.neuronArchitecture
-        #Convert string labels to numerical
-        self.bin_labels  = preprocessing.LabelBinarizer()
-        self.bin_labels.classes = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
         #Neuron architecture
         self.output_layer = nn.Linear(in_features=self.neuronArchitecture[-1],out_features=1)
         self.layer_list = []
@@ -183,9 +184,7 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        print(x)
         X, _ = self._preprocessor(x)
-        print(X)
         output = self.model(X).detach().numpy()
         return output
         #######################################################################
@@ -299,18 +298,19 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     bestPerformer = 0
     bestParams = None
     while iteration < iterations:
-        xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1, shuffle=True)
+        xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1)
         iteration += 1
         model = model_selection.GridSearchCV(
             estimator = Regressor(),
             param_grid = hyperparam,
             scoring="neg_root_mean_squared_error", #Scoring metric means lower is better
-            cv=2,
-            verbose=2,
+            cv=5,
+            verbose=4,
             n_jobs=5,
             return_train_score = True
             )
         model.fit(xTrain, yTrain, xValidation=xValidation, yValidation=yValidation, minImprovement=minImprovement)
+        print("next")
         results = pd.DataFrame(model.cv_results_) #Get results
         currentPerformer = results["mean_test_score"].max() #Find best performer from models
         #If the newest iteration has a worse performance, terminate tuning and return the last one
@@ -384,12 +384,12 @@ def example_main():
         "batchSize" : [64, 128, 256, 512],
         }
     #bestParams = RegressorHyperParameterSearch(x_train, y_train, hyperparam, minImprovement=0.01, candidateThreshold=0.05, iterations=2)
-    #print("Optimum parameters:", bestParams)
+    #dprint("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor()
+    regressor = Regressor(x_train)
     regressor.fit(x_train, y_train)
     #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
