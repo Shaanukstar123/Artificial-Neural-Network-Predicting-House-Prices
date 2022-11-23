@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 
+#Hello World
 
 def xavier_init(size, gain = 1.0):
     """
