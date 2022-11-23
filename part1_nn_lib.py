@@ -207,8 +207,8 @@ class LinearLayer(Layer):
         self._b = np.zeros(n_out, )
 
         self._cache_current = None  # forward
-        self._grad_W_current = np.ones((n_in, n_out)) # check if works else initlaise with empty array
-        self._grad_b_current = np.ones((n_out,))
+        self._grad_W_current = np.empty((n_in, n_out)) # check if works else initlaise with empty array
+        self._grad_b_current = np.empty((n_out,))
 
     #######################################################################
         #                       ** END OF YOUR CODE **
@@ -230,7 +230,7 @@ class LinearLayer(Layer):
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
         
-        self._cache_current = np.trasnpose(x)
+        self._cache_current = np.transpose(x)
         # linear function
         return np.dot(x, self._W) + self._b
         
