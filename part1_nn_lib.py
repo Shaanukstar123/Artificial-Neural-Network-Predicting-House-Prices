@@ -207,7 +207,7 @@ class LinearLayer(Layer):
         self._b = np.zeros(n_out, )
 
         self._cache_current = None  # forward
-        self._grad_W_current = np.empty((n_in, n_out)) # check if works else initlaise with empty array
+        self._grad_W_current = np.empty((n_in, n_out)) 
         self._grad_b_current = np.empty((n_out,))
 
     #######################################################################
@@ -252,9 +252,9 @@ class LinearLayer(Layer):
         """
         
         self._grad_W_current = np.dot(self._cache_current, grad_z)
-        self._grad_b_current = np.dot(np.ones(1, len(grad_z)), grad_z)
+        self._grad_b_current = np.dot(np.ones((1, len(grad_z)), dtype = int), grad_z)
         
-        return np.dot(np.transpose(self._W), grad_z)
+        return np.dot(grad_z, np.transpose(self._W))
         
         
 
@@ -266,6 +266,7 @@ class LinearLayer(Layer):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
+        
         self._W = self._W - learning_rate * self._grad_W_current
         self._b = self._b - learning_rate * self._grad_b_current
 
@@ -334,7 +335,7 @@ class MultiLayerNetwork(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
         # return np.zeros((1, self.neurons[-1])) # Replace with your own code
-        prev_layer = self.layers[0].forward(x)
+        prev_layer = self._layers[0].forward(x)
         for layer in self._layers[1:]:
             prev_layer = layer.forward(prev_layer)
             
