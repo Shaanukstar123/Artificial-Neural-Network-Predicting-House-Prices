@@ -9,7 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-    def __init__(self, nb_epoch=10, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, paramDict=None):
+    def __init__(self, x=None, nb_epoch=10, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -84,6 +84,7 @@ class Regressor():
         x.reset_index(drop=True, inplace=True)
         x = x.drop(columns="ocean_proximity",axis = 0)
         x = x.join(proximity_column)
+        print(x)
         if training:
             #Determine scaling factors
             self.xMin = x.min()
@@ -298,20 +299,19 @@ def RegressorHyperParameterSearch(x, y, hyperparam, minImprovement=0.1, candidat
     bestPerformer = 0
     bestParams = None
     while iteration < iterations:
-        print(x)
         xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x, y, test_size=0.1)
-        print(xTrain)
         iteration += 1
         model = model_selection.GridSearchCV(
             estimator = Regressor(),
             param_grid = hyperparam,
             scoring="neg_root_mean_squared_error", #Scoring metric means lower is better
-            cv=2,
-            verbose=2,
-            n_jobs=1,
+            cv=5,
+            verbose=4,
+            n_jobs=5,
             return_train_score = True
             )
         model.fit(xTrain, yTrain, xValidation=xValidation, yValidation=yValidation, minImprovement=minImprovement)
+        print("next")
         results = pd.DataFrame(model.cv_results_) #Get results
         currentPerformer = results["mean_test_score"].max() #Find best performer from models
         #If the newest iteration has a worse performance, terminate tuning and return the last one
@@ -385,12 +385,12 @@ def example_main():
         "batchSize" : [64, 128, 256, 512],
         }
     #bestParams = RegressorHyperParameterSearch(x_train, y_train, hyperparam, minImprovement=0.01, candidateThreshold=0.05, iterations=2)
-    #print("Optimum parameters:", bestParams)
+    #dprint("Optimum parameters:", bestParams)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor()
+    regressor = Regressor(x_train)
     regressor.fit(x_train, y_train)
     #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
