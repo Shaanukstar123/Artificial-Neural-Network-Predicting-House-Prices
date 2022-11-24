@@ -125,8 +125,10 @@ class SigmoidLayer(Layer):
 
         # g(z) = 1 / (1 + e^{-z})
 
-        self._cache_current = x
-        return 1 / (1+ np.exp(-x))
+
+        self._cache_current = np.reciprocal(np.exp(-x) + 1)
+        return self._cache_current
+
 
         # self._cache_current = 1 / (1+ np.exp(-x))
         # return self._cache_current
@@ -154,8 +156,7 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        y = self._cache_current
-        sigmoid =  1 / (1+ np.exp(-y))
+        sigmoid = self._cache_current
 
         return grad_z * sigmoid * (1 - sigmoid)
         #######################################################################
@@ -195,8 +196,8 @@ class ReluLayer(Layer):
         # self._cache_current = x Old Code
         # return np.where(x > 0, x, 0)
 
-        self._cache_current = x.clip(min=0) # cancel out all negatives
-        return self._cache_current
+        self._cache_current = x 
+        return x.clip(min=0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -221,9 +222,8 @@ class ReluLayer(Layer):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-
         result = np.where(self._cache_current > 0, 1, 0)
-        return np.multiply(result, grad_z)
+        return np.multiply(grad_z, result)
 
         #######################################################################
         #                       ** START OF YOUR CODE **
@@ -253,8 +253,7 @@ class LinearLayer(Layer):
         self._b = np.zeros((1, n_out))
 
         self._cache_current = None  # forward
-        self._grad_W_current = None 
-        self._grad_b_current = None
+        self._grad_W_current = None
 
         #######################################################################
             #                       ** END OF YOUR CODE **
@@ -282,6 +281,7 @@ class LinearLayer(Layer):
         self._cache_current = np.transpose(x)
         # linear function
         return np.dot(x, self._W) + self._b
+
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
@@ -303,7 +303,7 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        
+    
         self._grad_W_current = np.dot(self._cache_current, grad_z)
         self._grad_b_current = np.dot(np.ones((1, len(grad_z)), dtype = int), grad_z)
         
@@ -348,32 +348,28 @@ class MultiLayerNetwork(object):
         self.activations = activations
 
         #######################################################################
-        #                       ** START OF YOUR CODE **
+        #                       ** START OF YOUR CODE **  
         #######################################################################
-        self._layers = [] #Array to store all the instances of various layers instantiated
-        
+
+        self._layers = []
         layer_count = len(neurons)
         
-
         for i in range(layer_count):
-            if(i == 0):
-                #print("Linear Layer")
-                self._layers.append(LinearLayer(input_dim, neurons[i]))
-            
-            else:
-                #print("Linear Layer")
-                self._layers.append(LinearLayer(neurons[i-1], neurons[i]))
 
-            if(activations[i] == "relu"):
-                #print("ReLu")
-                self._layers.append(ReluLayer())
-            
-            else:
-                # sigmoid
-                #print("Sigmoid")
+            layerInput = input_dim
+
+            if(i != 0):
+                layerInput = neurons[i-1]
+
+            activation_str = activations[i]
+
+            self._layers.append(LinearLayer(layerInput, neurons[i]))
+    
+            if activation_str == "sigmoid":
                 self._layers.append(SigmoidLayer())
+            elif activation_str == "relu":
+                self._layers.append(ReluLayer())
 
-            
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -393,12 +389,13 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        # return np.zeros((1, self.neurons[-1])) # Replace with your own code
+      
         prev_layer = self._layers[0].forward(x)
         for layer in self._layers[1:]:
             prev_layer = layer.forward(prev_layer)
             
         return prev_layer
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -442,16 +439,12 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        for l in range(len(self._layers)-2, -1, -2):
-            # print("Len of array is ", len(self._layers))
-
-            # if(type(self._layers[l]) is LinearLayer):
-            #     print(f"{l} linear layer")
-
-            self._layers[l].update_params(learning_rate)
-
+        for l in range(0, len(self._layers), 2):
+            self._layers[l].update_params(learning_rate)    
         
-        
+        # for l in range(len(self._layers)-2, -1, -2):
+        #     self._layers[l].update_params(learning_rate)
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -574,8 +567,10 @@ class Trainer(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        for i in range(self.nb_epoch):
-
+        for j in range(0, self.nb_epoch):
+            if self.shuffle_flag: 
+                Trainer.shuffle(input_dataset, target_dataset)
+            
             number_of_batches = int(input_dataset.shape[0] / self.batch_size)
             input_batches = np.array_split(input_dataset, number_of_batches)
             target_batches = np.array_split(target_dataset, number_of_batches)
@@ -585,7 +580,6 @@ class Trainer(object):
                 self._loss_layer.forward(output,target_batches[i])
                 self.network.backward(self._loss_layer.backward())
                 self.network.update_params(self.learning_rate)
-
 
             # if(self.shuffle_flag):
             #     Trainer.shuffle(input_dataset, target_dataset)
