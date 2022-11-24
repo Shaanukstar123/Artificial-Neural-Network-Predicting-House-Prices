@@ -125,11 +125,11 @@ class SigmoidLayer(Layer):
 
         # g(z) = 1 / (1 + e^{-z})
 
-        #self._cache_current = x Old Code
-        # return 1 / (1+ np.exp(-x))
+        self._cache_current = x
+        return 1 / (1+ np.exp(-x))
 
-        self._cache_current = 1 / (1+ np.exp(-x))
-        return self._cache_current
+        # self._cache_current = 1 / (1+ np.exp(-x))
+        # return self._cache_current
 
         #######################################################################
         #                       ** END OF YOUR CODE **
