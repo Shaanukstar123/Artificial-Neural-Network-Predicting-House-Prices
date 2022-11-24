@@ -254,6 +254,7 @@ class LinearLayer(Layer):
 
         self._cache_current = None  # forward
         self._grad_W_current = None
+        self._grad_b_current = None
 
         #######################################################################
             #                       ** END OF YOUR CODE **
