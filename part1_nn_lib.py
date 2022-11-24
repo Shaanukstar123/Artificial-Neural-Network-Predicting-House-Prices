@@ -125,11 +125,11 @@ class SigmoidLayer(Layer):
 
         # g(z) = 1 / (1 + e^{-z})
 
-        #self._cache_current = x Old Code
-        # return 1 / (1+ np.exp(-x))
+        self._cache_current = x
+        return 1 / (1+ np.exp(-x))
 
-        self._cache_current = 1 / (1+ np.exp(-x))
-        return self._cache_current
+        # self._cache_current = 1 / (1+ np.exp(-x))
+        # return self._cache_current
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -221,6 +221,7 @@ class ReluLayer(Layer):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+
         result = np.where(self._cache_current > 0, 1, 0)
         return np.multiply(result, grad_z)
 
@@ -249,7 +250,7 @@ class LinearLayer(Layer):
             #                      ** START OF YOUR CODE **
         #######################################################################
         self._W = xavier_init((n_in, n_out))
-        self._b = np.zeros(1, n_out)
+        self._b = np.zeros((1, n_out))
 
         self._cache_current = None  # forward
         self._grad_W_current = None 
@@ -319,8 +320,8 @@ class LinearLayer(Layer):
             learning_rate {float} -- Learning rate of update step.
         """
         
-        self._W = self._W - learning_rate * self._grad_W_current
-        self._b = self._b - learning_rate * self._grad_b_current
+        self._W -= learning_rate * self._grad_W_current
+        self._b -= learning_rate * self._grad_b_current
 
 
 class MultiLayerNetwork(object):
@@ -352,6 +353,8 @@ class MultiLayerNetwork(object):
         self._layers = [] #Array to store all the instances of various layers instantiated
         
         layer_count = len(neurons)
+        
+
         for i in range(layer_count):
             if(i == 0):
                 #print("Linear Layer")
@@ -370,8 +373,7 @@ class MultiLayerNetwork(object):
                 #print("Sigmoid")
                 self._layers.append(SigmoidLayer())
 
-                
-
+            
 
         #######################################################################
         #                       ** END OF YOUR CODE **
