@@ -119,8 +119,22 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
         
-        self._cache_current = x
-        return 1 / (1+ np.exp(-x))
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+
+        # g(z) = 1 / (1 + e^{-z})
+
+        #self._cache_current = x Old Code
+        # return 1 / (1+ np.exp(-x))
+
+        self._cache_current = 1 / (1+ np.exp(-x))
+        return self._cache_current
+
+        #######################################################################
+        #                       ** END OF YOUR CODE **
+        #######################################################################
+        
 
 
     def backward(self, grad_z):
@@ -137,9 +151,17 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
         y = self._cache_current
         sigmoid =  1 / (1+ np.exp(-y))
+
         return grad_z * sigmoid * (1 - sigmoid)
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+
 
 
 class ReluLayer(Layer):
@@ -166,8 +188,20 @@ class ReluLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        self._cache_current = x
-        return np.where(x > 0, x, 0)
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+        
+        # self._cache_current = x Old Code
+        # return np.where(x > 0, x, 0)
+
+        self._cache_current = x.clip(min=0) # cancel out all negatives
+        return self._cache_current
+
+        #######################################################################
+        #                       ** END OF YOUR CODE **
+        #######################################################################
+
 
     def backward(self, grad_z):
         """
@@ -183,8 +217,16 @@ class ReluLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        
-        return np.multiply(np.where(self._cache_current > 0, 1, 0), grad_z)
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+
+        result = np.where(self._cache_current > 0, 1, 0)
+        return np.multiply(result, grad_z)
+
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
 
 
 class LinearLayer(Layer):
@@ -207,15 +249,15 @@ class LinearLayer(Layer):
             #                      ** START OF YOUR CODE **
         #######################################################################
         self._W = xavier_init((n_in, n_out))
-        self._b = np.zeros(n_out, )
+        self._b = np.zeros(1, n_out)
 
         self._cache_current = None  # forward
-        self._grad_W_current = np.empty((n_in, n_out)) 
-        self._grad_b_current = np.empty((n_out,))
+        self._grad_W_current = None 
+        self._grad_b_current = None
 
-    #######################################################################
-        #                       ** END OF YOUR CODE **
-    #######################################################################
+        #######################################################################
+            #                       ** END OF YOUR CODE **
+        #######################################################################
 
         
 
@@ -232,10 +274,17 @@ class LinearLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+    
         self._cache_current = np.transpose(x)
         # linear function
         return np.dot(x, self._W) + self._b
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+
         
         
 
