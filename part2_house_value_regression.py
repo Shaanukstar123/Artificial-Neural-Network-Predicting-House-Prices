@@ -405,16 +405,13 @@ def example_main():
     # hyperparam = RegressorHyperParameterSearch(xTrain, yTrain, hyperparam, candidateThreshold=0.05, iterations=2)
     # print("Optimum parameters:", hyperparam)
     # Training
-    # This example trains on the whole available dataset. 
-    # You probably want to separate some held-out data 
-    # to make sure the model isn't overfitting
     regressor = Regressor(xTrain)
     regressor.fit(xTrain, yTrain)
     print(regressor.get_params())
     save_regressor(regressor)
 
     # Error
-    error = regressor.score(x_train, y_train)
+    error = regressor.score(xValidation, yValidation)
     print("\nRegressor error: {}\n".format(error))
 
 
