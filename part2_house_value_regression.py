@@ -38,8 +38,9 @@ class Regressor():
             }
         self.paramDict = paramDict
         self.set_params(**self.paramDict)
-        #Convert string labels to numerical
-        self.testing_labels = None
+        #Convert string labels to numerical - hardcode the  binarizer
+        self.binarizer = preprocessing.LabelBinarizer()
+        self.binarizer.classes_ = ['<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN']
         #Early stop parameters
         self.allowance = 5
         self.count = 0
@@ -84,23 +85,11 @@ class Regressor():
             else:
                 x[col].fillna(x[col].median(), inplace=True)
 
-        #binarises textual elements
-        if training:
-            training_labels = preprocessing.LabelBinarizer()
-            training_labels.classes_ = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
-            proximity_column  = pd.DataFrame(training_labels.fit_transform(x["ocean_proximity"]))
-            self.testing_labels = training_labels
-        else:
-            #uses saved binarizer from training in case testing data doesn't contain all ocean proximity classes
-            proximity_column  = pd.DataFrame(self.testing_labels.transform(x["ocean_proximity"])) 
-
-
-        #print("proximity_col: ",proximity_column)
+        #Binarize 
+        proximity_column  = pd.DataFrame(self.binarizer.transform(x["ocean_proximity"])) 
         x.reset_index(drop=True, inplace=True)
         x = x.drop(columns="ocean_proximity",axis = 0)
         x = x.join(proximity_column)
-        #print("Postprocessed")
-        #print(x)
         if training:
             #Determine scaling factors
             self.xMin = x.min()
@@ -169,6 +158,7 @@ class Regressor():
                 if self.earlyStop(newError) and not plotData:
                     print("Reached epoch cycle:", currEpoc, "with error:", newError)
                     break
+                #Used for epoch plotting in helper notebook
                 if currEpoc > 1 and plotData:
                     trainError = self.score(x, y)
                     self.epochData[0].append(currEpoc)
@@ -232,12 +222,14 @@ class Regressor():
         #######################################################################
 
     # All helper functions in class
+    #Generate random weights
     @staticmethod
     def init_weights(layer):
         if isinstance(layer, nn.Linear):
             nn.init.xavier_uniform_(layer.weight)
             layer.bias.data.fill_(0)
     
+    #Early stopping function
     def earlyStop(self, validationLoss):
         if validationLoss*(self.minImprovement+1) < self.prevLoss:
             self.prevLoss = validationLoss
@@ -248,6 +240,7 @@ class Regressor():
                 return True
         return False
 
+    #For sklearn
     def get_params(self, deep=False):
         return self.paramDict
     
@@ -277,7 +270,6 @@ def load_regressor():
     return trained_model
 
 # Helper functions
-#This function will find the top two paramters and create a range between them
 #This function will find the top two paramters and create a range between them
 def getTopTwo(inputList):
     paramHeaders = {"nb_epoch" : 0, "learningRate" : 1, "neuronArchitecture" : 2, "batchSize" : 3}
@@ -403,8 +395,6 @@ def example_main():
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
     xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x_train, y_train, test_size=0.1)
-    sample = x_train.iloc[0:2]
-    #print(sample)
     #Hyperparameter tuning
     hyperparam = {
         "nb_epoch" : [100], 
@@ -422,8 +412,6 @@ def example_main():
     regressor.fit(xTrain, yTrain, xValidation, yValidation)
     print(regressor.get_params())
     #print()
-    #print(regressor.predict(sample))
-    #regressor.score(x, y) #need this to compare against parameter tuning maybe make held out dataset?
     save_regressor(regressor)
 
     # Error
