@@ -9,7 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-    def __init__(self, x=None, nb_epoch=100, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, minImprovement=0.005, paramDict=None):
+    def __init__(self, x=None, nb_epoch=100, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, minImprovement=0.00005, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -44,6 +44,8 @@ class Regressor():
         self.allowance = 5
         self.count = 0
         self.prevLoss = math.inf
+        #epoch plotter
+        self.epochData = [[], [], []]
         return
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -85,6 +87,7 @@ class Regressor():
         #binarises textual elements
         if training:
             training_labels = preprocessing.LabelBinarizer()
+            training_labels.classes_ = ["<1H OCEAN","INLAND","NEAR OCEAN","NEAR BAY","NEAR OCEAN"]
             proximity_column  = pd.DataFrame(training_labels.fit_transform(x["ocean_proximity"]))
             self.testing_labels = training_labels
         else:
@@ -110,7 +113,7 @@ class Regressor():
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-    def fit(self, x, y, xValidation=None, yValidation=None):
+    def fit(self, x, y, xValidation=None, yValidation=None, plotData=False):
         """
         Regressor training function
 
@@ -140,32 +143,37 @@ class Regressor():
         self.model = nn.Sequential(*self.layer_list) #unpacks list as parameters for sequential layers
         self.model.apply(self.init_weights)
         self.model.to(torch.float64)
+        network = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
+        lossFunc = nn.MSELoss()
         #Preprocess training data to generate scalars
         X, Y = self._preprocessor(x, y = y, training = True)
         #Mini-batch gradient descent:
         torch.set_printoptions(profile="full")
         currEpoc = 0
-        epochError = math.inf
         while currEpoc < self.nb_epoch:
             batch_list = torch.randperm(len(X)) # generates random indices
             print(currEpoc, end='-')
             for i in range(0,len(X),self.batchSize):
-                network = torch.optim.Adam(self.model.parameters(), lr=self.learningRate)
                 network.zero_grad()
                 index = batch_list[i:i+self.batchSize]
                 batch_x = X[index]
                 batch_y = Y[index]
                 prediction = self.model(batch_x)
-                batch_loss = nn.MSELoss()(prediction,batch_y) # MSELoss is a wrapper function
+                batch_loss = lossFunc(prediction,batch_y) # MSELoss is a wrapper function
                 batch_loss.backward()
                 network.step()
             currEpoc += 1
             #Use the validation set to implement early stopping - used during hyperparamter tuning
             if xValidation is not None:
                 newError = self.score(xValidation, yValidation)
-                if self.earlyStop(newError):
+                if self.earlyStop(newError) and not plotData:
                     print("Reached epoch cycle:", currEpoc, "with error:", newError)
                     break
+                if currEpoc > 1 and plotData:
+                    trainError = self.score(x, y)
+                    self.epochData[0].append(currEpoc)
+                    self.epochData[1].append(newError)
+                    self.epochData[2].append(trainError)
         return
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -330,6 +338,8 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.05, ite
             return bestParams
         bestPerformer = currentPerformer
         bestParams = model.best_params_
+        if (iteration == iterations):
+            return bestParams
         #Get all models within 'candidateThreshold' % of best performance
         resultsTop = results.loc[results["mean_test_score"] >= bestPerformer*(1+candidateThreshold)]
         paramList = resultsTop["params"].values
@@ -343,8 +353,10 @@ def RegressorHyperParameterSearch(x, y, hyperparam, candidateThreshold=0.05, ite
             #Determine the magnitude of the learning rate 
             if len(newParams["learningRate"]) >= 2:
                 learningMagnitude = sum([math.log(x, 10) for x in newParams["learningRate"][:2]])/2
-            else:
+            elif len(newParams["learningRate"]) == 1:
                 learningMagnitude = math.log(newParams["learningRate"][0], 10)
+            else:
+                return bestParams
         print("Layercount:", layerCount, "Learning Magnitude:", learningMagnitude, "Learning rate approx:", 10**learningMagnitude)
         hyperparam = {"nb_epoch" : None, "learningRate" : None, "neuronArchitecture" : [], "batchSize" : None}
         magnitudeModifier = 0.6
