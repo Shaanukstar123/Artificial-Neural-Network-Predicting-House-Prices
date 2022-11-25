@@ -9,7 +9,7 @@ import random
 import torch.nn as nn
 
 class Regressor():
-    def __init__(self, x=None, nb_epoch=100, learningRate=0.01, neuronArchitecture=[13,9], batchSize=64, minImprovement=0.00005, paramDict=None):
+    def __init__(self, x=None, nb_epoch=82, learningRate=0.09, neuronArchitecture=[10,7], batchSize=103, minImprovement=0.00005, paramDict=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -397,21 +397,20 @@ def example_main():
     xTrain, xValidation, yTrain, yValidation = model_selection.train_test_split(x_train, y_train, test_size=0.1)
     #Hyperparameter tuning
     hyperparam = {
-        "nb_epoch" : [100], 
-        "learningRate" : [0.001, 0.01, 0.1], 
+        "nb_epoch" : [300], 
+        "learningRate" : [0.001, 0.01, 0.1, 1], 
         "neuronArchitecture" : [[9], [9,9], [9,9,9]], 
         "batchSize" : [64, 128, 256, 512],
         }
-    hyperparam = RegressorHyperParameterSearch(xTrain, yTrain, hyperparam, candidateThreshold=0.05, iterations=2)
-    print("Optimum parameters:", hyperparam)
+    # hyperparam = RegressorHyperParameterSearch(xTrain, yTrain, hyperparam, candidateThreshold=0.05, iterations=2)
+    # print("Optimum parameters:", hyperparam)
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(xTrain, paramDict=hyperparam)
-    regressor.fit(xTrain, yTrain, xValidation, yValidation)
+    regressor = Regressor(xTrain)
+    regressor.fit(xTrain, yTrain)
     print(regressor.get_params())
-    #print()
     save_regressor(regressor)
 
     # Error
